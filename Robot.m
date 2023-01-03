@@ -7,7 +7,7 @@ classdef Robot
         AnalyticalJacobianMatrix;
     end
     properties (Access = private)
-        a1,a2,a3,a4,t_1,t_2,d_1;
+        a1,a2,a3,a4,t_1,t_2,d_1, inertia_vars,mass, r;
     end
     methods
         %%Default constructor
@@ -19,6 +19,9 @@ classdef Robot
             obj.t_1 = sym("t_1");
             obj.t_2 = sym("t_2");
             obj.d_1 = sym("d_1");
+            obj.inertia_vars = [sym("a"), sym("b"), sym("c")];
+            obj.mass = sym("mass");
+            obj.r = sym("r");
 
             obj.Joints = ["Revolut","Prismatic","Revolut"];
 
@@ -66,8 +69,16 @@ classdef Robot
         function AnalyticalJacobianMatrixSolved = solveAnalyticalJacobianMatrix(obj, t_1,d_1,t_2)
             AnalyticalJacobianMatrixSolved = double(subs(obj.AnalyticalJacobianMatrix,[obj.a1,obj.a2,obj.a3,obj.a4, obj.t_1,obj.d_1,obj.t_2],[0.15,0.4,0.3,0.16,t_1,d_1,t_2]));
         end
+
+        function x = test(obj, a,b,c,m)
+            x = 0;
+            x = obj.cylinderInertia(obj.inertia_vars(1),obj.inertia_vars(2),obj.inertia_vars(3), obj.mass);
+            x = obj.translateInertia(x, obj.mass, obj.r);
+            x = double(subs(x, [obj.inertia_vars(1),obj.inertia_vars(2),obj.inertia_vars(3),obj.mass, obj.r],[a,b,c,m,(-c/2)]));
+        end
     end
     methods (Access = private)
+
         function matrix = dhMatrixGenerator(~, dh_table, i)
             matrix = [
                 [cos(dh_table(2,i)), -sin(dh_table(2,i))*cos(dh_table(3,i)), sin(dh_table(2,i))*sin(dh_table(3,i)), dh_table(4,i)*cos(dh_table(2,i))];
@@ -77,6 +88,7 @@ classdef Robot
 
             ];
         end
+
         function matrixA = getTransformationMatrix(obj, dh_table)
             matrixA = obj.dhMatrixGenerator(dh_table,1);
             for i = 2:(size(dh_table, 2))
@@ -117,6 +129,27 @@ classdef Robot
                    analyticalJacobianMatrix(j,i) = diff(pe(j),q(i));
                end
             end
+        end
+
+        function inertia = cylinderInertia(obj, a, b, c, m)
+            inertia = [
+                    [1/2*m*(a^2+b^2), 0, 0];
+                    [0, 1/2*m*(3*(a^2+b^2)^2+c^2), 0];
+                    [0, 0, 1/2*m*(3*(a^2+b^2)^2+c^2)]
+                    ];
+        end
+
+        function inertia = rectangleInertia(obj,a,b,c,m)
+            inertia = [
+                [1/12*m*(b^2+c^2), 0, 0];
+                [0,1/12*m*(a^2+c^2),0];
+                [0,0,1/12*m*(a^2+b^2)];
+                ];
+        end
+
+        function inertia = translateInertia(obj, inertiaTensor,m, r)
+            r_ = [r,0,0];
+            inertia = inertiaTensor+(m*(r_'*r_*eye(3)-r_*r_'));
         end
     end
 end
