@@ -7,7 +7,7 @@ classdef Robot
         AnalyticalJacobianMatrix;
     end
     properties (Access = private)
-        a1,a2,a3,a4,t_1,t_2,d_1, inertia_vars,mass, r;
+        a1,a2,a3,a4,t_1,t_2,d_1, inertia_vars,mass, r, q_dot, masses, lengths;
     end
     methods
         %%Default constructor
@@ -22,6 +22,11 @@ classdef Robot
             obj.inertia_vars = [sym("a"), sym("b"), sym("c")];
             obj.mass = sym("mass");
             obj.r = sym("r");
+            obj.q_dot = [[sym("q1_dot")]; [sym("q2_dot")]; [sym("q3_dot")];];
+            obj.masses = [sym("m1"), sym("m2"), sym("m3")];
+            obj.lengths = [[sym("a1"),sym("b1"),sym("c1")];
+                            [sym("a2"),sym("b2"),sym("c2")];
+                            [sym("a3"),sym("b3"),sym("c3")]];
 
             obj.Joints = ["Revolut","Prismatic","Revolut"];
 
@@ -33,9 +38,9 @@ classdef Robot
                 [obj.a1,0,obj.a3+obj.d_1,0];
                 ];
 
-             obj.TransoformationMatrix = obj.getTransformationMatrix(obj.DH_table);
+             obj.TransoformationMatrix = obj.getTransformationMatrixEE(obj.DH_table);
 
-             obj.GeometricalJacobianMatrix = obj.generateJacobianMatrix(obj.DH_table,obj.Joints);
+             obj.GeometricalJacobianMatrix = obj.generateJacobianMatrix(obj.DH_table,obj.Joints, 3);
 
              obj.AnalyticalJacobianMatrix = obj.generateAnalyticalJacobianMatrix(obj.TransoformationMatrix(1:3,4),[obj.t_1,obj.d_1,obj.t_2]);
         end
@@ -72,9 +77,7 @@ classdef Robot
 
         function x = test(obj, a,b,c,m)
             x = 0;
-            x = obj.cylinderInertia(obj.inertia_vars(1),obj.inertia_vars(2),obj.inertia_vars(3), obj.mass);
-            x = obj.translateInertia(x, obj.mass, obj.r);
-            x = double(subs(x, [obj.inertia_vars(1),obj.inertia_vars(2),obj.inertia_vars(3),obj.mass, obj.r],[a,b,c,m,(-c/2)]));
+            obj.kineticEnergy(obj.masses, obj.GeometricalJacobianMatrix, obj.q_dot, obj.DH_table,obj.Joints,obj.lengths );
         end
     end
     methods (Access = private)
@@ -89,9 +92,16 @@ classdef Robot
             ];
         end
 
-        function matrixA = getTransformationMatrix(obj, dh_table)
+        function matrixA = getTransformationMatrix(obj, dh_table, index)
             matrixA = obj.dhMatrixGenerator(dh_table,1);
-            for i = 2:(size(dh_table, 2))
+            for i = 2:index
+                matrixA = matrixA * obj.dhMatrixGenerator(dh_table,i);
+            end
+        end
+
+        function matrixA = getTransformationMatrixEE(obj, dh_table)
+            matrixA = obj.dhMatrixGenerator(dh_table,1);
+            for i = 2:(size(obj.DH_table, 2))
                 matrixA = matrixA * obj.dhMatrixGenerator(dh_table,i);
             end
 
@@ -105,11 +115,11 @@ classdef Robot
             matrixA = matrixA * rotationHomogeneousMatrix;
         end
 
-        function jacobianMatrix = generateJacobianMatrix(obj, dh_table,joints)
+        function jacobianMatrix = generateJacobianMatrix(obj, dh_table,joints, index)
             jacobianMatrix = sym(zeros(6,size(joints,2)));
             pn = obj.TransoformationMatrix(1:3,4);
             matrix = obj.dhMatrixGenerator(dh_table,1);
-            for i = 1:(size(joints,2))
+            for i = 1:index
                 if joints(i) == "Revolut"
                     jacobianMatrix(1:3,i) = matrix(1:3,3);
                     jacobianMatrix(4:6,i) = cross(matrix(1:3,3),pn-matrix(1:3,4));
@@ -145,6 +155,31 @@ classdef Robot
                 [0,1/12*m*(a^2+c^2),0];
                 [0,0,1/12*m*(a^2+b^2)];
                 ];
+        end
+
+        function KE = kineticEnergy(obj,m,J,q_dot, dh_table,joints, lenghts)
+            Jz = sym(zeros(3,size(q_dot,2)));
+            Jz(1:3,1:1) = J(1:3,1:1);
+            Isym = 0;
+            Bq = 0;
+            for i = 1:size(q_dot,2)
+                Jp = Jz;
+                Jp(1:3,1:i) = J(1:3,1:i);
+                KEL = m(i)*(Jp'*Jp);
+                R = obj.getTransformationMatrix(dh_table, i); %may be i + 1
+                R = R(1:3,1:3);
+                if joints(i) == "Revolut"
+                    Isym = obj.cylinderInertia(lenghts(i,1), lenghts(i,2), lenghts(i,3), m(i));
+                elseif joints(i) == "Prismatic"
+                    Isym = obj.rectangleInertia(lenghts(i,1),lenghts(i,2), lenghts(i,3), m(i));
+                end
+                I = obj.translateInertia(Isym, m(i), (-lenghts(i,3)/2));
+                Jo = Jz;
+                Jo(1:3,1:i) = J(4:6,1:i);
+                KER = Jo'*R*I*R'*Jo;
+                Bq = Bq + (KEL + KER);
+            end
+            KE = 1/2 * q_dot' * Bq * q_dot;
         end
 
         function inertia = translateInertia(obj, inertiaTensor,m, r)
