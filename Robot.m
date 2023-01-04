@@ -7,15 +7,15 @@ classdef Robot
         AnalyticalJacobianMatrix;
     end
     properties (Access = private)
-        a1,a2,a3,a4,t_1,t_2,d_1, inertia_vars,mass, r, q_dot, masses, lengths;
+        r1,r2,r3,r4,t_1,t_2,d_1, inertia_vars,mass, r, q_dot, masses, lengths;
     end
     methods
         %%Default constructor
         function obj = Robot()
-            obj.a1 = sym("a1");
-            obj.a2 = sym("a2");
-            obj.a3 = sym("a3");
-            obj.a4 = sym("a4");
+            obj.r1 = sym("r1");
+            obj.r2 = sym("r2");
+            obj.r3 = sym("r3");
+            obj.r4 = sym("r4");
             obj.t_1 = sym("t_1");
             obj.t_2 = sym("t_2");
             obj.d_1 = sym("d_1");
@@ -34,8 +34,8 @@ classdef Robot
                 ["theta", "alpha","r","d"]
                 [pi/2,obj.t_1, 0, obj.t_2];
                 [pi/2,-pi/2,0,0];
-                [0,obj.a2,0,obj.a4];
-                [obj.a1,0,obj.a3+obj.d_1,0];
+                [0,obj.r2,0,obj.r4];
+                [obj.r1,0,obj.r3+obj.d_1,0];
                 ];
 
              obj.TransoformationMatrix = obj.getTransformationMatrixEE(obj.DH_table);
@@ -46,23 +46,23 @@ classdef Robot
         end
 
         function kinematics = directKinematics(obj, t_1, d_1, t_2)
-           kinematics = double(subs(obj.TransoformationMatrix, [obj.a1,obj.a2,obj.a3,obj.a4,obj.t_1, obj.t_2,obj.d_1], [0.15, 0.4, 0.3, 0.16, t_1,t_2, d_1]));
+           kinematics = double(subs(obj.TransoformationMatrix, [obj.r1,obj.r2,obj.r3,obj.r4,obj.t_1, obj.t_2,obj.d_1], [0.15, 0.4, 0.3, 0.16, t_1,t_2, d_1]));
         end
 
         function inverKinematics = inverseKinematics(obj, px, py, pz)
-            sin_theta_2 = (px/-obj.a4);
+            sin_theta_2 = (px/-obj.r4);
             cos_theta_2 = sqrt(1 - power(sin_theta_2,2));
             atan_theta_2 = atan2(sin_theta_2,cos_theta_2);
-            theta_2_val = double(real(subs(atan_theta_2,[obj.a1,obj.a2,obj.a3,obj.a4],[0.15,0.4,0.3,0.16])));
+            theta_2_val = double(real(subs(atan_theta_2,[obj.r1,obj.r2,obj.r3,obj.r4],[0.15,0.4,0.3,0.16])));
 
             r = obj.a2 + obj.a4*cos(theta_2_val);
-            d_1 = sqrt(power(py,2) + power((pz - obj.a1),2) - power(r,2)) - obj.a3;
-            d_1_val = double(real(subs(d_1,[obj.a1,obj.a2,obj.a3,obj.a4],[0.15,0.4,0.3,0.16])));
+            d_1 = sqrt(power(py,2) + power((pz - obj.r1),2) - power(r,2)) - obj.r3;
+            d_1_val = double(real(subs(d_1,[obj.r1,obj.r2,obj.r3,obj.r4],[0.15,0.4,0.3,0.16])));
 
-            cos_theta_1 = ((pz-obj.a1)*(obj.a3+d_1_val)+ r*py)/(power((obj.a3+d_1_val),2)+power(r,2));
-            sin_theta_1 = -1*((py*(obj.a3+d_1_val))+(r*obj.a1)-(r*pz))/(power(r,2)+power((obj.a3+d_1_val),2));
+            cos_theta_1 = ((pz-obj.r1)*(obj.r3+d_1_val)+ r*py)/(power((obj.r3+d_1_val),2)+power(r,2));
+            sin_theta_1 = -1*((py*(obj.a3+d_1_val))+(r*obj.r1)-(r*pz))/(power(r,2)+power((obj.r3+d_1_val),2));
             atan_theta_1 = atan2(sin_theta_1,cos_theta_1);
-            theta_1_val = double(real(subs(atan_theta_1,[obj.a1,obj.a2,obj.a3,obj.a4],[0.15,0.4,0.3,0.16])));
+            theta_1_val = double(real(subs(atan_theta_1,[obj.r1,obj.r2,obj.r3,obj.r4],[0.15,0.4,0.3,0.16])));
             
             inverKinematics = [theta_1_val*(180/pi), d_1_val, theta_2_val*(180/pi)];
         end
@@ -76,8 +76,11 @@ classdef Robot
         end
 
         function x = test(obj, a,b,c,m)
-            x = 0;
-            obj.kineticEnergy(obj.masses, obj.GeometricalJacobianMatrix, obj.q_dot, obj.DH_table,obj.Joints,obj.lengths );
+            [KE,Bq] = obj.kineticEnergy(obj.masses, obj.GeometricalJacobianMatrix, obj.q_dot, obj.DH_table,obj.Joints,obj.lengths );
+            %x = subs(j, [ ...
+             %   obj.masses(1),obj.masses(2),obj.masses(3),obj.r1,obj.r2,obj.r3,obj.r4, obj.t_1,obj.d_1,obj.t_2, ...
+              %  obj.lengths(1,1),obj.lengths(1,2),obj.lengths(1,3),obj.lengths(2,1),obj.lengths(2,2),obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2),obj.lengths(3,3)
+               % ],[0.2,0.4,0.6, 0.15,0.4,0.3,0.16, 1.3,1.5,1.2, 0.02,0.12566,0.4, 0.03, 0.03,0.3, 0.02,0.12566,0.16]);
         end
     end
     methods (Access = private)
@@ -131,7 +134,7 @@ classdef Robot
             end
         end
 
-        function analyticalJacobianMatrix = generateAnalyticalJacobianMatrix(obj,pe,q)
+        function analyticalJacobianMatrix = generateAnalyticalJacobianMatrix(~,pe,q)
             analyticalJacobianMatrix = sym(zeros(3,size(q,2)));
             
             for j = 1:3
@@ -141,7 +144,7 @@ classdef Robot
             end
         end
 
-        function inertia = cylinderInertia(obj, a, b, c, m)
+        function inertia = cylinderInertia(~, a, b, c, m)
             inertia = [
                     [1/2*m*(a^2+b^2), 0, 0];
                     [0, 1/2*m*(3*(a^2+b^2)^2+c^2), 0];
@@ -149,7 +152,7 @@ classdef Robot
                     ];
         end
 
-        function inertia = rectangleInertia(obj,a,b,c,m)
+        function inertia = rectangleInertia(~,a,b,c,m)
             inertia = [
                 [1/12*m*(b^2+c^2), 0, 0];
                 [0,1/12*m*(a^2+c^2),0];
@@ -157,15 +160,15 @@ classdef Robot
                 ];
         end
 
-        function KE = kineticEnergy(obj,m,J,q_dot, dh_table,joints, lenghts)
-            Jz = sym(zeros(3,size(q_dot,2)));
-            Jz(1:3,1:1) = J(1:3,1:1);
+        function [KE,Bq] = kineticEnergy(obj,m,J,q_dot, dh_table,joints, lenghts)
+            Jz = sym(zeros(3,size(q_dot,1)));
+            %Jz(1:3,1:1) = J(1:3,1:1);
             Isym = 0;
             Bq = 0;
-            for i = 1:size(q_dot,2)
+            for i = 1:size(q_dot,1)
                 Jp = Jz;
-                Jp(1:3,1:i) = J(1:3,1:i);
-                KEL = m(i)*(Jp'*Jp);
+                Jp(1:3,1:i) = J(4:6,1:i);
+                KEL = m(i)*Jp'*Jp;
                 R = obj.getTransformationMatrix(dh_table, i); %may be i + 1
                 R = R(1:3,1:3);
                 if joints(i) == "Revolut"
@@ -175,14 +178,14 @@ classdef Robot
                 end
                 I = obj.translateInertia(Isym, m(i), (-lenghts(i,3)/2));
                 Jo = Jz;
-                Jo(1:3,1:i) = J(4:6,1:i);
+                Jo(1:3,1:i) = J(1:3,1:i);
                 KER = Jo'*R*I*R'*Jo;
                 Bq = Bq + (KEL + KER);
             end
             KE = 1/2 * q_dot' * Bq * q_dot;
         end
 
-        function inertia = translateInertia(obj, inertiaTensor,m, r)
+        function inertia = translateInertia(~, inertiaTensor,m, r)
             r_ = [r,0,0];
             inertia = inertiaTensor+(m*(r_'*r_*eye(3)-r_*r_'));
         end
