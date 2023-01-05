@@ -7,7 +7,7 @@ classdef Robot
         AnalyticalJacobianMatrix;
     end
     properties (Access = private)
-        r1,r2,r3,r4,t_1,t_2,d_1, inertia_vars, q_dot, q_dot_dot, masses, lengths, g;
+        r1,r2,r3,r4, inertia_vars,q, q_dot, q_dot_dot, masses, lengths, g;
     end
     methods
         %%Default constructor
@@ -16,11 +16,9 @@ classdef Robot
             obj.r2 = sym("r2");
             obj.r3 = sym("r3");
             obj.r4 = sym("r4");
-            obj.t_1 = sym("t_1");
-            obj.t_2 = sym("t_2");
-            obj.d_1 = sym("d_1");
             obj.inertia_vars = [sym("a"), sym("b"), sym("c")];
             obj.g = sym("g");
+            obj.q = [[sym("q1")]; [sym("q2")]; [sym("q3")];];
             obj.q_dot = [[sym("q1_dot")]; [sym("q2_dot")]; [sym("q3_dot")];];
             obj.q_dot_dot = [[sym("q1_dot_dot")]; [sym("q2_dot_dot")]; [sym("q3_dot_dot")];];
             obj.masses = [sym("m1"), sym("m2"), sym("m3")];
@@ -32,21 +30,21 @@ classdef Robot
 
             obj.DH_table = [
                 ["theta", "alpha","r","d"]
-                [pi/2,obj.t_1, 0, obj.t_2];
+                [pi/2,obj.q(1), 0, obj.q(3)];
                 [pi/2,-pi/2,0,0];
                 [0,obj.r2,0,obj.r4];
-                [obj.r1,0,obj.r3+obj.d_1,0];
+                [obj.r1,0,obj.r3+obj.q(2),0];
                 ];
 
              obj.TransoformationMatrix = obj.getTransformationMatrixEE(obj.DH_table);
 
              obj.GeometricalJacobianMatrix = obj.generateJacobianMatrix(obj.DH_table,obj.Joints, 3);
 
-             obj.AnalyticalJacobianMatrix = obj.generateAnalyticalJacobianMatrix(obj.TransoformationMatrix(1:3,4),[obj.t_1,obj.d_1,obj.t_2]);
+             obj.AnalyticalJacobianMatrix = obj.generateAnalyticalJacobianMatrix(obj.TransoformationMatrix(1:3,4),obj.q);
         end
 
         function kinematics = directKinematics(obj, t_1, d_1, t_2)
-           kinematics = double(subs(obj.TransoformationMatrix, [obj.r1,obj.r2,obj.r3,obj.r4,obj.t_1, obj.t_2,obj.d_1], [0.15, 0.4, 0.3, 0.16, t_1,t_2, d_1]));
+           kinematics = double(subs(obj.TransoformationMatrix, [obj.r1,obj.r2,obj.r3,obj.r4,obj.q(1), obj.q(3),obj.q(2)], [0.15, 0.4, 0.3, 0.16, t_1,t_2, d_1]));
         end
 
         function inverKinematics = inverseKinematics(obj, px, py, pz)
@@ -68,11 +66,11 @@ classdef Robot
         end
 
         function JacobianMatrixSolved = solveGeometricalJacobianMatrix(obj, t_1,d_1,t_2)
-            JacobianMatrixSolved = double(subs(obj.GeometricalJacobianMatrix,[obj.a1,obj.a2,obj.a3,obj.a4, obj.t_1,obj.d_1,obj.t_2],[0.15,0.4,0.3,0.16,t_1,d_1,t_2]));
+            JacobianMatrixSolved = double(subs(obj.GeometricalJacobianMatrix,[obj.a1,obj.a2,obj.a3,obj.a4, obj.q(1),obj.q(2),obj.q(3)],[0.15,0.4,0.3,0.16,t_1,d_1,t_2]));
         end
 
         function AnalyticalJacobianMatrixSolved = solveAnalyticalJacobianMatrix(obj, t_1,d_1,t_2)
-            AnalyticalJacobianMatrixSolved = double(subs(obj.AnalyticalJacobianMatrix,[obj.a1,obj.a2,obj.a3,obj.a4, obj.t_1,obj.d_1,obj.t_2],[0.15,0.4,0.3,0.16,t_1,d_1,t_2]));
+            AnalyticalJacobianMatrixSolved = double(subs(obj.AnalyticalJacobianMatrix,[obj.a1,obj.a2,obj.a3,obj.a4, obj.q(1),obj.q(2),obj.q(3)],[0.15,0.4,0.3,0.16,t_1,d_1,t_2]));
         end
         function inertia = momentOfInertia(obj,Bq, q_dot_dot, i,n)
             inertia = 0;
@@ -80,11 +78,24 @@ classdef Robot
                 inertia = Bq(i,j)*q_dot_dot;
             end
         end
+
+        function Coriolis = coriolisMatrix(obj, q, q_dot, Bq)
+            Coriolis = sym(zeros(size(q,1),size(q,1)));
+            for i = 1:size(q,1)
+                for j = 1:size(q,1)
+                    for k = 1:size(q,1)
+                        ck = 1/2*(diff(Bq(i,j), q(k)) + diff(Bq(i,k), q(j)) - diff(Bq(j,k), q(i))) * q_dot(k);
+                        Coriolis(i,j) =  Coriolis(i,j) + ck;
+                    end
+                end
+            end
+        end
         
         function x = test(obj, a,b,c,m)
             [KE,Bq] = obj.kineticEnergy(obj.masses, obj.GeometricalJacobianMatrix, obj.q_dot, obj.DH_table,obj.Joints,obj.lengths );
             PE = obj.potentialEnergy(obj.masses, obj.g,obj.DH_table);
             I1 = obj.momentOfInertia(Bq, obj.q_dot_dot(1), 1, 3);
+            obj.coriolisMatrix(obj.q,obj.q_dot, Bq);
         end
     end
     methods (Access = private)
