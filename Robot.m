@@ -7,7 +7,7 @@ classdef Robot
         AnalyticalJacobianMatrix;
     end
     properties (Access = private)
-        r1,r2,r3,r4,t_1,t_2,d_1, inertia_vars,mass, r, q_dot, masses, lengths;
+        r1,r2,r3,r4,t_1,t_2,d_1, inertia_vars, q_dot, q_dot_dot, masses, lengths, g;
     end
     methods
         %%Default constructor
@@ -20,9 +20,9 @@ classdef Robot
             obj.t_2 = sym("t_2");
             obj.d_1 = sym("d_1");
             obj.inertia_vars = [sym("a"), sym("b"), sym("c")];
-            obj.mass = sym("mass");
-            obj.r = sym("r");
+            obj.g = sym("g");
             obj.q_dot = [[sym("q1_dot")]; [sym("q2_dot")]; [sym("q3_dot")];];
+            obj.q_dot_dot = [[sym("q1_dot_dot")]; [sym("q2_dot_dot")]; [sym("q3_dot_dot")];];
             obj.masses = [sym("m1"), sym("m2"), sym("m3")];
             obj.lengths = [[sym("a1"),sym("b1"),sym("c1")];
                             [sym("a2"),sym("b2"),sym("c2")];
@@ -74,13 +74,17 @@ classdef Robot
         function AnalyticalJacobianMatrixSolved = solveAnalyticalJacobianMatrix(obj, t_1,d_1,t_2)
             AnalyticalJacobianMatrixSolved = double(subs(obj.AnalyticalJacobianMatrix,[obj.a1,obj.a2,obj.a3,obj.a4, obj.t_1,obj.d_1,obj.t_2],[0.15,0.4,0.3,0.16,t_1,d_1,t_2]));
         end
-
+        function inertia = momentOfInertia(obj,Bq, q_dot_dot, i,n)
+            inertia = 0;
+            for j = 1:n
+                inertia = Bq(i,j)*q_dot_dot;
+            end
+        end
+        
         function x = test(obj, a,b,c,m)
             [KE,Bq] = obj.kineticEnergy(obj.masses, obj.GeometricalJacobianMatrix, obj.q_dot, obj.DH_table,obj.Joints,obj.lengths );
-            %x = subs(j, [ ...
-             %   obj.masses(1),obj.masses(2),obj.masses(3),obj.r1,obj.r2,obj.r3,obj.r4, obj.t_1,obj.d_1,obj.t_2, ...
-              %  obj.lengths(1,1),obj.lengths(1,2),obj.lengths(1,3),obj.lengths(2,1),obj.lengths(2,2),obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2),obj.lengths(3,3)
-               % ],[0.2,0.4,0.6, 0.15,0.4,0.3,0.16, 1.3,1.5,1.2, 0.02,0.12566,0.4, 0.03, 0.03,0.3, 0.02,0.12566,0.16]);
+            PE = obj.potentialEnergy(obj.masses, obj.g,obj.DH_table);
+            I1 = obj.momentOfInertia(Bq, obj.q_dot_dot(1), 1, 3);
         end
     end
     methods (Access = private)
@@ -159,7 +163,17 @@ classdef Robot
                 [0,0,1/12*m*(a^2+b^2)];
                 ];
         end
-
+        function PE = potentialEnergy(obj, m,g, dh_table)
+            gVec = [[0];[0];[-g]];
+            PE = 0;
+            for i = 1: size(m,2)
+                T = obj.getTransformationMatrix(dh_table,i+1);
+                PE = PE + (m(i)*gVec'*T(1:3,4));
+            end
+            PE = -1*PE;
+        end
+        %note, May be last rotation is not added and that can cause issue
+        %in R0_E rotation
         function [KE,Bq] = kineticEnergy(obj,m,J,q_dot, dh_table,joints, lenghts)
             Jz = sym(zeros(3,size(q_dot,1)));
             %Jz(1:3,1:1) = J(1:3,1:1);
