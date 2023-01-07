@@ -72,30 +72,23 @@ classdef Robot
         function AnalyticalJacobianMatrixSolved = solveAnalyticalJacobianMatrix(obj, t_1,d_1,t_2)
             AnalyticalJacobianMatrixSolved = double(subs(obj.AnalyticalJacobianMatrix,[obj.a1,obj.a2,obj.a3,obj.a4, obj.q(1),obj.q(2),obj.q(3)],[0.15,0.4,0.3,0.16,t_1,d_1,t_2]));
         end
-        function inertia = momentOfInertia(obj,Bq, q_dot_dot, i,n)
-            inertia = 0;
-            for j = 1:n
-                inertia = Bq(i,j)*q_dot_dot;
-            end
+
+        function torque = langrangianEquationOfMotion(obj)
+            [KE,Bq] = obj.kineticEnergy(obj.masses, obj.GeometricalJacobianMatrix, obj.q_dot, obj.DH_table,obj.Joints,obj.lengths );
+            PE = obj.potentialEnergy(obj.masses, obj.g,obj.DH_table);
+            Cq = obj.coriolisMatrix(obj.q,obj.q_dot, Bq);
+            Gq = obj.gravityMatrix(obj.masses, obj.g, obj.GeometricalJacobianMatrix);
+
+            torque = Bq*obj.q_dot_dot + Cq*obj.q_dot + Gq;
+            simplify(torque);
         end
 
-        function Coriolis = coriolisMatrix(obj, q, q_dot, Bq)
-            Coriolis = sym(zeros(size(q,1),size(q,1)));
-            for i = 1:size(q,1)
-                for j = 1:size(q,1)
-                    for k = 1:size(q,1)
-                        ck = 1/2*(diff(Bq(i,j), q(k)) + diff(Bq(i,k), q(j)) - diff(Bq(j,k), q(i))) * q_dot(k);
-                        Coriolis(i,j) =  Coriolis(i,j) + ck;
-                    end
-                end
-            end
-        end
-        
         function x = test(obj, a,b,c,m)
             [KE,Bq] = obj.kineticEnergy(obj.masses, obj.GeometricalJacobianMatrix, obj.q_dot, obj.DH_table,obj.Joints,obj.lengths );
             PE = obj.potentialEnergy(obj.masses, obj.g,obj.DH_table);
             I1 = obj.momentOfInertia(Bq, obj.q_dot_dot(1), 1, 3);
-            obj.coriolisMatrix(obj.q,obj.q_dot, Bq);
+            %Cq = obj.coriolisMatrix(obj.q,obj.q_dot, Bq);
+            Gq = obj.gravityMatrix(obj.masses, obj.g, obj.GeometricalJacobianMatrix);
         end
     end
     methods (Access = private)
@@ -213,6 +206,42 @@ classdef Robot
         function inertia = translateInertia(~, inertiaTensor,m, r)
             r_ = [r,0,0];
             inertia = inertiaTensor+(m*(r_'*r_*eye(3)-r_*r_'));
+        end
+
+        %not used, computed directly
+        function inertia = momentOfInertia(obj,Bq, q_dot_dot, i,n)
+            inertia = 0;
+            for j = 1:n
+                inertia = Bq(i,j)*q_dot_dot;
+            end
+        end
+
+        function Coriolis = coriolisMatrix(obj, q, q_dot, Bq)
+            Coriolis = sym(zeros(size(q,1),size(q,1)));
+            for i = 1:size(q,1)
+                for j = 1:size(q,1)
+                    for k = 1:size(q,1)
+                        ck = 1/2*(diff(Bq(i,j), q(k)) + diff(Bq(i,k), q(j)) - diff(Bq(j,k), q(i))) * q_dot(k);
+                        Coriolis(i,j) =  Coriolis(i,j) + ck;
+                    end
+                end
+            end
+        end
+        
+        %may be it is wrong
+        function Gravity = gravityMatrix(obj, m, g, J)
+            Gravity = sym(zeros(size(m,2),1));
+            gVec = [[0];[0];[-g]];
+            Jz = sym(zeros(3,size(m,2)));
+            for i = 1:size(m,2)
+                for j = 1:size(m,2)
+                    Jp = Jz;
+                    Jp(1:3,1:j) = J(4:6,1:j); %not sure. we have to use linear or angular part (Linear part should be considered, but currently using angular part)
+                    JL = gVec' * Jp(1:3,i);
+                    Gravity(i) = Gravity(i) + (m(j)*JL);
+                end
+            end
+
         end
     end
 end
