@@ -16,7 +16,6 @@ classdef Robot
             obj.r2 = sym("r2");
             obj.r3 = sym("r3");
             obj.r4 = sym("r4");
-            obj.inertia_vars = [sym("a"), sym("b"), sym("c")];
             obj.g = sym("g");
             obj.q = [[sym("q1")]; [sym("q2")]; [sym("q3")];];
             obj.q_dot = [[sym("q1_dot")]; [sym("q2_dot")]; [sym("q3_dot")];];
@@ -83,12 +82,8 @@ classdef Robot
             simplify(torque);
         end
 
-        function x = test(obj, a,b,c,m)
-            [KE,Bq] = obj.kineticEnergy(obj.masses, obj.GeometricalJacobianMatrix, obj.q_dot, obj.DH_table,obj.Joints,obj.lengths );
-            PE = obj.potentialEnergy(obj.masses, obj.g,obj.DH_table);
-            I1 = obj.momentOfInertia(Bq, obj.q_dot_dot(1), 1, 3);
-            %Cq = obj.coriolisMatrix(obj.q,obj.q_dot, Bq);
-            Gq = obj.gravityMatrix(obj.masses, obj.g, obj.GeometricalJacobianMatrix);
+        function test(obj, robot)
+
         end
     end
     methods (Access = private)
