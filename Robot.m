@@ -87,11 +87,14 @@ classdef Robot
            r1_value = 0.15;
            density = 2700; %Almunium density
            mass_values = [obj.lengths(1,1)*obj.lengths(1,2)*obj.lengths(1,3)*density, obj.lengths(2,1)*obj.lengths(2,2)*obj.lengths(3,3)*density, obj.lengths(3,1)*obj.lengths(3,2)*obj.lengths(3,3)*density];
+           
            lenghts_values = [
                [0.02, 0.1256, 0.4]; 
                [0.03, 0.03, 0.3]; 
                [0.02, 0.1256, 0.16]
                ];
+
+           mass_values = subs(mass_values, [obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3)], [lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3)]);
 
            q_dot_values = [0,0,0];
            q_dot_dot_values = [0,0,0];
@@ -100,6 +103,9 @@ classdef Robot
 
            f_e_values = [0;0;0];
            mu_e_values = [0;0;0];
+
+           parameters_old = [obj.masses(1), obj.masses(2), obj.masses(3),obj.g, obj.q(1), obj.q(2), obj.q(3),obj.r1, obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3)];
+           parameters_new  = [mass_values(1), mass_values(2), mass_values(3), g_value, q_values(1),q_values(2),q_values(3),r1_value, lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3)];
 
            disp("q vector: ");
            disp(q_values);
@@ -138,21 +144,21 @@ classdef Robot
            disp("Toolbox H_1_1 results: ");
            disp(H1_1_tool);
            disp("Ours H_1_1 results: ");
-           disp(double(subs(H1_1_ours, [obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp(double(subs(H1_1_ours, parameters_old,parameters_new)));
 
            H1_2_ours = obj.getHomogeneousMatrix(obj.DH_table, 2,3);
            H1_2_handMade = obj.dhMatrixGenerator(obj.DH_table, 2);
            disp("Handmade H_2_3 results: ");
-           disp(double(subs(H1_2_handMade, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp(double(subs(H1_2_handMade, parameters_old,parameters_new)));
            disp("Ours H_2_3 results: ");
-           disp(double(subs(H1_2_ours, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp(double(subs(H1_2_ours, parameters_old,parameters_new)));
 
            H1_3_ours = obj.getHomogeneousMatrix(obj.DH_table, 1,3);
            H1_3_handMade = obj.dhMatrixGenerator(obj.DH_table, 1) * obj.dhMatrixGenerator(obj.DH_table, 2);
            disp("Handmade H_1_3 results: ");
-           disp(double(subs(H1_3_handMade, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp(double(subs(H1_3_handMade, parameters_old,parameters_new)));
            disp("Ours H_1_3 results: ");
-           disp(double(subs(H1_3_ours, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp(double(subs(H1_3_ours, parameters_old,parameters_new)));
 
            H4_5_ours = obj.getHomogeneousMatrix(obj.DH_table, 4,5);
            H4_5_handMade = obj.dhMatrixGenerator(obj.DH_table, 4) * [
@@ -162,17 +168,17 @@ classdef Robot
                 [0,0,0,1];
             ];
            disp("Handmade H_4_5 results: ");
-           disp(double(subs(H4_5_handMade, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp(double(subs(H4_5_handMade, parameters_old,parameters_new)));
            disp("Ours H_4_5 results: ");
-           disp(double(subs(H4_5_ours, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp(double(subs(H4_5_ours, parameters_old,parameters_new)));
 
            H_toolbox_ee = getTransform(robot, config, "ee");
            H_ours_ee = obj.getHomogeneousMatrix(obj.DH_table,1,5);
 
            disp("Toolbox H_1_5 (ee) results: ");
-           disp(double(subs(H_toolbox_ee, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp(double(subs(H_toolbox_ee, parameters_old,parameters_new)));
            disp("Ours H_1_5(ee) results: ");
-           disp(double(subs(H_ours_ee, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp(double(subs(H_ours_ee, parameters_old,parameters_new)));
 
            disp("<<-- Testing Partials Jacobians -->>")
            disp("J_P_2_3 Handmade: ");
@@ -242,6 +248,20 @@ classdef Robot
            disp("J_P_2_5 Ours");
            partial_ours = obj.partialJacobian(obj.DH_table,obj.P_COM,obj.Joints, 4);
            disp(simplify(partial_ours));
+
+           disp("<<-- Potential Energy -->>");
+           PE = obj.potentialEnergy(obj.masses, obj.DH_table,obj.P_COM ,obj.g);
+           disp(double(subs(PE, parameters_old, parameters_new)));
+
+           disp(" <<-- Gravity Matrix -->>");
+           disp("Gravity Differential Matrix");
+           gravityDifferential = obj.gravityMatrixDrifferential(PE, obj.q);
+           disp(double(subs(gravityDifferential, parameters_old, parameters_new)));
+
+           disp("Gravity Matrix");
+           gravityPotential = obj.gravityMatrix(obj.DH_table, obj.P_COM, obj.Joints, obj.masses, obj.g);
+           disp(double(subs(gravityPotential,  parameters_old, parameters_new)));
+
         end
 
         function demo(obj)
@@ -348,6 +368,31 @@ classdef Robot
                     partial(4:6,i-1) = H_pre(1:3,3);
                 end
 
+            end
+        end
+    
+        function PE = potentialEnergy(obj, masses, dh_table, CoM, g)
+            PE = 0;
+            gvec = [0;-g;0];
+            for i = 2:4
+                H = obj.getHomogeneousMatrix(dh_table, 2,i+1);
+                Pl = H(1:3,1:3)*CoM(i-1,:)'+H(1:3,4);
+                PE = PE + (-masses(i-1)*gvec'*Pl);
+            end
+        end
+
+        function G = gravityMatrixDrifferential(obj, U, q)
+            G = [diff(U,q(1)); diff(U,q(2)); diff(U,q(3))];
+        end
+
+        function G = gravityMatrix(obj, dh_table, P_COM, joints, masses, g)
+            G = sym(zeros(3,1));
+            gvec = [0;-g;0];
+            for i = 2:4
+                for j = 2:4
+                    Jp = obj.partialJacobian(dh_table,P_COM, joints, j);
+                    G(i-1,1) = G(i-1,1) + (-masses(j-1)*gvec'*Jp(4:6, i-1));
+                end
             end
         end
     end
