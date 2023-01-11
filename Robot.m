@@ -7,7 +7,7 @@ classdef Robot
         AnalyticalJacobianMatrix;
     end
     properties (Access = private)
-        r1,inertia_vars,q, q_dot, q_dot_dot, masses, lengths, g, f_e, mu_e;
+        r1,inertia_vars,q, q_dot, q_dot_dot, masses, lengths, g, f_e, mu_e, P_COM;
     end
     methods
         %%Default constructor
@@ -21,6 +21,10 @@ classdef Robot
             obj.lengths = [[sym("a1"),sym("b1"),sym("c1")];
                             [sym("a2"),sym("b2"),sym("c2")];
                             [sym("a3"),sym("b3"),sym("c3")]];
+            obj.P_COM = [
+                [-obj.lengths(1,3)/2,0,0];
+                [0,0,-obj.lengths(2,3)/2];
+                [0,0,-obj.lengths(3,3)/2];]
 
             obj.Joints = ["Revolut","Prismatic","Revolut"];
 
@@ -35,7 +39,7 @@ classdef Robot
              obj.f_e = [sym("fex");sym("fey");sym("fez")];
              obj.mu_e = [sym("muex");sym("muey");sym("muez")];
 
-             obj.TransoformationMatrix = obj.getTransformationMatrixEE(obj.DH_table);
+             obj.TransoformationMatrix = obj.getTransformationMatrix(obj.DH_table, 4);
 
              obj.GeometricalJacobianMatrix = obj.generateJacobianMatrix(obj.DH_table,obj.Joints, 3);
 
@@ -72,16 +76,6 @@ classdef Robot
             AnalyticalJacobianMatrixSolved = double(subs(obj.AnalyticalJacobianMatrix,[obj.r1,obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3), obj.q(1),obj.q(2),obj.q(3)],[0.15,0.4,0.3,0.16,t_1,d_1,t_2]));
         end
 
-        function torque = langrangianEquationOfMotion(obj)
-            [KE,Bq] = obj.kineticEnergy(obj.masses, obj.GeometricalJacobianMatrix, obj.q_dot, obj.DH_table,obj.Joints,obj.lengths );
-            PE = obj.potentialEnergy(obj.masses, obj.g,obj.DH_table);
-            Cq = obj.coriolisMatrix(obj.q,obj.q_dot, Bq);
-            Gq = obj.gravityMatrix(obj.masses, obj.g, obj.GeometricalJacobianMatrix);
-
-            torque = Bq*obj.q_dot_dot + Cq*obj.q_dot + Gq;
-            simplify(torque);
-        end
-
         function torque = newtonEulerEquationOfMotion(obj)
             [w, w_dot, p_dot_dot_c] = obj.forwardRecursion(obj.q, obj.q_dot, obj.q_dot_dot, obj.g, obj.Joints, obj.lengths);
             torque = obj.backwardEquation(obj.masses,p_dot_dot_c, w, w_dot, obj.f_e, obj.mu_e, obj.Joints, obj.lengths );
@@ -89,10 +83,15 @@ classdef Robot
 
         function test(obj, robot)
            q_values = [2.357, 0.1498, 1.1815];
-
+           %q_values = [0, 0, 0];
+           r1_value = 0.15;
            density = 2700; %Almunium density
            mass_values = [obj.lengths(1,1)*obj.lengths(1,2)*obj.lengths(1,3)*density, obj.lengths(2,1)*obj.lengths(2,2)*obj.lengths(3,3)*density, obj.lengths(3,1)*obj.lengths(3,2)*obj.lengths(3,3)*density];
-           lenghts_values = [[0.02, 0.1256, 0.4]; [0.03, 0.03, 0.3]; [0.02, 0.1256, 0.16]];
+           lenghts_values = [
+               [0.02, 0.1256, 0.4]; 
+               [0.03, 0.03, 0.3]; 
+               [0.02, 0.1256, 0.16]
+               ];
 
            q_dot_values = [0,0,0];
            q_dot_dot_values = [0,0,0];
@@ -132,57 +131,117 @@ classdef Robot
            disp("Analytical Jacobian Ours: ");
            disp(obj.solveAnalyticalJacobianMatrix(q_values(1),q_values(2),q_values(3)));
 
-           disp("<--B(q) validation-->");
-           [~,Bq] = obj.kineticEnergy(obj.masses, obj.GeometricalJacobianMatrix, obj.q_dot, obj.DH_table,obj.Joints,obj.lengths);
-           Bq_subs = Bq;
-           for i = 1:size(obj.Joints,2)
-               Bq_subs = subs(Bq_subs, [obj.q(i), obj.q_dot(i), obj.masses(i)],[q_values(i),q_dot_values(i), mass_values(i)]);
-               Bq_subs = subs(Bq_subs, [obj.lengths(i,1),obj.lengths(i,2),obj.lengths(i,3)],[lenghts_values(i,1),lenghts_values(i,2),lenghts_values(i,3)]);
-           end
+           disp("<<-- Testing Homogenous Transformations -->>")
 
-           disp("B(q) values: ");
-           Bq_solved = double(Bq_subs);
-           disp(Bq_solved);
+           H1_1_ours = obj.getHomogeneousMatrix(obj.DH_table, 1,1);
+           H1_1_tool = getTransform(robot, config, "base_link");
+           disp("Toolbox H_1_1 results: ");
+           disp(H1_1_tool);
+           disp("Ours H_1_1 results: ");
+           disp(double(subs(H1_1_ours, [obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
 
-           if(Bq_solved' == Bq_solved)
-               disp("B(q) is skew-symetric matrix.");
-           else
-               disp("B(q) is not skew-symetric matrix.");
-           end
+           H1_2_ours = obj.getHomogeneousMatrix(obj.DH_table, 2,3);
+           H1_2_handMade = obj.dhMatrixGenerator(obj.DH_table, 2);
+           disp("Handmade H_2_3 results: ");
+           disp(double(subs(H1_2_handMade, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp("Ours H_2_3 results: ");
+           disp(double(subs(H1_2_ours, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
 
-           disp("Eigen vector: ");
-           disp(eig(Bq_solved));
+           H1_3_ours = obj.getHomogeneousMatrix(obj.DH_table, 1,3);
+           H1_3_handMade = obj.dhMatrixGenerator(obj.DH_table, 1) * obj.dhMatrixGenerator(obj.DH_table, 2);
+           disp("Handmade H_1_3 results: ");
+           disp(double(subs(H1_3_handMade, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp("Ours H_1_3 results: ");
+           disp(double(subs(H1_3_ours, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
 
-           A = Bq_solved;
-           eig_vals = eig((A + A')/2); 
-           is_pd = [sum([sign(eig_vals)==1])==length(A)];  % flag to check if it is PD
-           if is_pd ==1 
-                disp("A is Positive Definite.")
-           else 
-                disp("A isn't Positive Definite.")
-           end
+           H4_5_ours = obj.getHomogeneousMatrix(obj.DH_table, 4,5);
+           H4_5_handMade = obj.dhMatrixGenerator(obj.DH_table, 4) * [
+                [0,0,1,0];
+                [0,1,0,0];
+                [-1,0,0,0];
+                [0,0,0,1];
+            ];
+           disp("Handmade H_4_5 results: ");
+           disp(double(subs(H4_5_handMade, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp("Ours H_4_5 results: ");
+           disp(double(subs(H4_5_ours, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
 
-           langrangian_EOM = obj.langrangianEquationOfMotion();
+           H_toolbox_ee = getTransform(robot, config, "ee");
+           H_ours_ee = obj.getHomogeneousMatrix(obj.DH_table,1,5);
 
-           for i = 1:size(obj.Joints,2)
-               langrangian_EOM = subs(langrangian_EOM, [obj.q(i), obj.q_dot(i),obj.q_dot_dot(i), obj.masses(i)],[q_values(i),q_dot_values(i),q_dot_dot_values(i), mass_values(i)]);
-               langrangian_EOM = subs(langrangian_EOM, [obj.lengths(i,1),obj.lengths(i,2),obj.lengths(i,3)],[lenghts_values(i,1),lenghts_values(i,2),lenghts_values(i,3)]);
-           end
+           disp("Toolbox H_1_5 (ee) results: ");
+           disp(double(subs(H_toolbox_ee, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
+           disp("Ours H_1_5(ee) results: ");
+           disp(double(subs(H_ours_ee, [obj.r1,obj.q(1),obj.q(2), obj.q(3), obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3)], [r1_value,q_values(1),q_values(2),q_values(3),lenghts_values(1,3),lenghts_values(2,3),lenghts_values(3,3)])));
 
-           langrangian_EOM = subs(langrangian_EOM, obj.g,g_value);
-           disp("Tourqes Langrangian: ");
-           tourqesLangrangian = double(langrangian_EOM)
+           disp("<<-- Testing Partials Jacobians -->>")
+           disp("J_P_2_3 Handmade: ");
+           H = obj.getHomogeneousMatrix(obj.DH_table, 2,3);
+           P_C_2_3 = H(1:3,1:3) * obj.P_COM(1,:)' + H(1:3,4);
+           
+           H_pre = obj.getHomogeneousMatrix(obj.DH_table,2,2); %H_j-1
+           P_J_m_1 = H_pre(1:3,4); %P_j-1
+           Z2 = H_pre(1:3,3);
+           partial = sym(zeros(6,3));
+           partial(4:6,1) = cross(Z2, P_C_2_3 - P_J_m_1);
+           partial(1:3,1) = Z2;
+           disp(simplify(partial));
 
-           newtonEuler_EOM = obj.newtonEulerEquationOfMotion();
-           for i = 1:size(obj.Joints,2)
-               newtonEuler_EOM = subs(newtonEuler_EOM, [obj.q(i), obj.q_dot(i),obj.q_dot_dot(i), obj.masses(i)],[q_values(i),q_dot_values(i),q_dot_dot_values(i), mass_values(i)]);
-               newtonEuler_EOM = subs(newtonEuler_EOM, [obj.lengths(i,1),obj.lengths(i,2),obj.lengths(i,3)],[lenghts_values(i,1),lenghts_values(i,2),lenghts_values(i,3)]);
-           end
+           disp("J_P_2_3 Ours");
+           partial_ours = obj.partialJacobian(obj.DH_table,obj.P_COM,obj.Joints, 2);
+           disp(simplify(partial_ours));
 
-           disp("Tourqes Newton Euler: ");
-           newtonEuler_EOM = subs(newtonEuler_EOM, [obj.g, obj.f_e(1),obj.f_e(2),obj.f_e(3), obj.mu_e(1),obj.mu_e(2),obj.mu_e(3)],[g_value, f_e_values(1),f_e_values(2),f_e_values(3),mu_e_values(1),mu_e_values(2),mu_e_values(3)]);
-           tourqesNewtonEuler = double(newtonEuler_EOM)
+           disp("J_P_2_4 Handmade: ");
+           partial = sym(zeros(6,3));
 
+           H = obj.getHomogeneousMatrix(obj.DH_table, 2,4);
+           P_C_2_4 = H(1:3,1:3) * obj.P_COM(2,:)' + H(1:3,4);
+           
+           H_2_2 = obj.getHomogeneousMatrix(obj.DH_table,2,2); %H_j-1
+           P_2_2 = H_2_2(1:3,4); %P_j-1
+           Z2 = H_pre(1:3,3);
+
+           
+           partial(4:6,1) = cross(Z2, P_C_2_4 - P_2_2);
+           partial(1:3,1) = Z2;
+
+           H_2_3 = obj.getHomogeneousMatrix(obj.DH_table,2,3); %H_j-1
+           partial(4:6,2) = H_2_3(1:3,3);
+
+           disp(simplify(partial));
+
+           disp("J_P_2_4 Ours");
+           partial_ours = obj.partialJacobian(obj.DH_table,obj.P_COM,obj.Joints, 3);
+           disp(simplify(partial_ours));
+
+
+           disp("J_P_2_5 Handmade: ");
+           partial = sym(zeros(6,3));
+
+           H = obj.getHomogeneousMatrix(obj.DH_table, 2,5);
+           P_C_2_5 = H(1:3,1:3) * obj.P_COM(3,:)' + H(1:3,4);
+           
+           H_2_2 = obj.getHomogeneousMatrix(obj.DH_table,2,2); %H_j-1
+           P_2_2 = H_2_2(1:3,4); %P_j-1
+           Z2 = H_pre(1:3,3);
+
+           
+           partial(4:6,1) = cross(Z2, P_C_2_5 - P_2_2);
+           partial(1:3,1) = Z2;
+
+           H_2_3 = obj.getHomogeneousMatrix(obj.DH_table,2,3); %H_j-1
+           partial(4:6,2) = H_2_3(1:3,3);
+
+           H_2_4 = obj.getHomogeneousMatrix(obj.DH_table,2,4); %H_j-1
+           P_2_4 = H_2_4(1:3,4); %P_j-1
+           partial(4:6,3) = cross(H_2_4(1:3,3), P_C_2_5 - P_2_4);
+           partial(1:3,3) = H_2_4(1:3,3);
+
+           disp(simplify(partial));
+
+           disp("J_P_2_5 Ours");
+           partial_ours = obj.partialJacobian(obj.DH_table,obj.P_COM,obj.Joints, 4);
+           disp(simplify(partial_ours));
         end
 
         function demo(obj)
@@ -202,10 +261,11 @@ classdef Robot
             ];
         end
 
-        function matrixA = getTransformationMatrix(obj, dh_table, index)
-            matrixA = obj.dhMatrixGenerator(dh_table,1);
+        %Matrix from 1 to index, 1 is base frame
+        function matrix = getTransformationMatrix(obj, dh_table, index)
+            matrix = obj.dhMatrixGenerator(dh_table,1);
             for i = 2:index
-                matrixA = matrixA * obj.dhMatrixGenerator(dh_table,i);
+                matrix = matrix * obj.dhMatrixGenerator(dh_table,i);
             end
 
             if(index == (size(obj.DH_table, 2)))
@@ -216,34 +276,19 @@ classdef Robot
                 [0,0,0,1];
             ];
 
-            matrixA = matrixA * rotationHomogeneousMatrix;
+            matrix = matrix * rotationHomogeneousMatrix;
             end
-        end
-
-        function matrixA = getTransformationMatrixEE(obj, dh_table)
-            matrixA = obj.dhMatrixGenerator(dh_table,1);
-            for i = 2:(size(obj.DH_table, 2))
-                matrixA = matrixA * obj.dhMatrixGenerator(dh_table,i);
-            end
-
-            rotationHomogeneousMatrix = [
-                [0,0,1,0];
-                [0,1,0,0];
-                [-1,0,0,0];
-                [0,0,0,1];
-            ];
-
-            matrixA = matrixA * rotationHomogeneousMatrix;
         end
 
         function jacobianMatrix = generateJacobianMatrix(obj, dh_table,joints, index)
             jacobianMatrix = sym(zeros(6,size(joints,2)));
-            pn = obj.TransoformationMatrix(1:3,4);
+            pn = obj.getTransformationMatrix(dh_table,index+1);
+            pn =  pn(1:3,4); %extracting only position part
             matrix = obj.dhMatrixGenerator(dh_table,1);
-            for i = 1:index
+            for i = 1:index %1 is base frame
                 if joints(i) == "Revolut"
                     jacobianMatrix(1:3,i) = matrix(1:3,3);
-                    jacobianMatrix(4:6,i) = cross(matrix(1:3,3),pn-matrix(1:3,4));
+                    jacobianMatrix(4:6,i) = cross(matrix(1:3,3),pn - matrix(1:3,4));
                 else
                     jacobianMatrix(1:3,i) = [0,0,0];
                     jacobianMatrix(4:6,i) = matrix(1:3,3);
@@ -262,182 +307,47 @@ classdef Robot
             end
         end
 
-        function inertia = cylinderInertia(~, a, b, c, m)
-            inertia = [
-                    [1/2*m*(a^2+b^2), 0, 0];
-                    [0, 1/2*m*(3*(a^2+b^2)^2+c^2), 0];
-                    [0, 0, 1/2*m*(3*(a^2+b^2)^2+c^2)]
-                    ];
-        end
+        %1 is the base frame
+        function H = getHomogeneousMatrix(obj, dh_table, startIndex, endIndex)
+            H = sym(eye(4,4));
 
-        function inertia = rectangleInertia(~,a,b,c,m)
-            inertia = [
-                [1/12*m*(b^2+c^2), 0, 0];
-                [0,1/12*m*(a^2+c^2),0];
-                [0,0,1/12*m*(a^2+b^2)];
-                ];
-        end
-        function PE = potentialEnergy(obj, m,g, dh_table)
-            gVec = [[0];[0];[-g]];
-            PE = 0;
-            for i = 1: size(m,2)
-                T = obj.getTransformationMatrix(dh_table,i+1);
-                PE = PE + (m(i)*gVec'*T(1:3,4));
+            if(startIndex == endIndex) %if no transformation is needed, use empty homogeneous transformation
+                return
             end
-            PE = -1*PE;
-        end
 
-        %note, May be last rotation is not added and that can cause issue
-        %in R0_E rotation
-        function [KE,Bq] = kineticEnergy(obj,m,J,q_dot, dh_table,joints, lenghts)
-            Jz = sym(zeros(3,size(q_dot,1)));
-            Isym = 0;
-            Bq = 0;
-            for i = 1:size(q_dot,1)
-                Jp = Jz;
-                Jp(1:3,1:i) = J(4:6,1:i);
-                KEL = m(i)*Jp'*Jp;
-                R = obj.getTransformationMatrix(dh_table, i); %may be i + 1
-                R = R(1:3,1:3);
-                if joints(i) == "Revolut"
-                    Isym = obj.cylinderInertia(lenghts(i,1), lenghts(i,2), lenghts(i,3), m(i));
-                elseif joints(i) == "Prismatic"
-                    Isym = obj.rectangleInertia(lenghts(i,1),lenghts(i,2), lenghts(i,3), m(i));
-                end
-                I = obj.translateInertia(Isym, m(i), (-lenghts(i,3)/2));
-                Jo = Jz;
-                Jo(1:3,1:i) = J(1:3,1:i);
-                KER = Jo'*R*I*R'*Jo;
-                Bq = Bq + (KEL + KER);
+            for i = startIndex: endIndex-1
+                H = H * obj.dhMatrixGenerator(dh_table, i);
             end
-            KE = 1/2 * q_dot' * Bq * q_dot;
-        end
 
-        function inertia = translateInertia(~, inertiaTensor,m, r)
-            r_ = [r,0,0];
-            inertia = inertiaTensor+(m*(r_'*r_*eye(3)-r_*r_'));
-        end
+            if(endIndex == 5) %one extra rotation in the end
+                 rotationHomogeneousMatrix = [
+                [0,0,1,0];
+                [0,1,0,0];
+                [-1,0,0,0];
+                [0,0,0,1];
+            ];
 
-        %not used, computed directly
-        function inertia = momentOfInertia(~,Bq, q_dot_dot, i,n)
-            inertia = 0;
-            for j = 1:n
-                inertia = Bq(i,j)*q_dot_dot;
+            H = H * rotationHomogeneousMatrix;
             end
         end
 
-        function Coriolis = coriolisMatrix(~, q, q_dot, Bq)
-            Coriolis = sym(zeros(size(q,1),size(q,1)));
-            for i = 1:size(q,1)
-                for j = 1:size(q,1)
-                    for k = 1:size(q,1)
-                        ck = 1/2*(diff(Bq(i,j), q(k)) + diff(Bq(i,k), q(j)) - diff(Bq(j,k), q(i))) * q_dot(k);
-                        Coriolis(i,j) =  Coriolis(i,j) + ck;
-                    end
-                end
-            end
-        end
-        
-        %may be it is wrong
-        function Gravity = gravityMatrix(~, m, g, J)
-            Gravity = sym(zeros(size(m,2),1));
-            gVec = [[0];[0];[-g]];
-            Jz = sym(zeros(3,size(m,2)));
-            for i = 1:size(m,2)
-                for j = 1:size(m,2)
-                    Jp = Jz;
-                    Jp(1:3,1:j) = J(4:6,1:j); %not sure. we have to use linear or angular part (Linear part should be considered, but currently using angular part)
-                    JL = gVec' * Jp(1:3,i);
-                    Gravity(i) = Gravity(i) + (m(j)*JL);
-                end
-            end
+        %index 1 is base, but in this the base is transfered to link 1 so
+        %it is 2
+        function partial = partialJacobian(obj, dh_table, P_COM, joints, index)
+            partial = sym(zeros(6, size(joints,2)));
+            H = obj.getHomogeneousMatrix(dh_table, 2, index+1);
+            P_li = H(1:3,1:3)*P_COM(index-1,:)'+H(1:3,4);
 
-        end
+            for i=2:index
+                H_pre = obj.getHomogeneousMatrix(dh_table,2, i);
 
-        function [w_app,w_dot_app,p_dot_dot_c_app] = forwardRecursion(obj,q,q_dot,q_dot_dot, g, joints, lengths)
-            w_pre = [0;0;0];
-            w_pre_dot = [0;0;0];
-            Zo = [0;0;1];
-            w = 0;
-            w_dot = 0;
-            p_dot_dot_pre = [0;0;-g];
-
-            p_dot_dot_c_app = sym(zeros(3,1,size(q,1)));
-            w_app = sym(zeros(3,1,size(q,1)));
-            w_dot_app = sym(zeros(3,1,size(q,1)));
-
-            r_c = [
-                [-lengths(1,3)/2,0,0];
-                [0,0,-lengths(2,3)/2];
-                [0,0,-lengths(3,3)/2];
-                ];
-
-            for i = 1:size(joints,2)
-                H = (obj.dhMatrixGenerator(obj.DH_table, i)*obj.dhMatrixGenerator(obj.DH_table, i+1));
-                R = H(1:3,1:3);
-                
-                w = R'*w_pre;
-                w_dot = R'*w_pre_dot;
-
-                if(joints(i) == "Revolut")
-                    w = w + (R'*q_dot(i)*Zo);
-                    w_dot = w_dot + (R'*(q_dot_dot(i)*Zo + q_dot(i)*cross(w_pre,Zo)));
-                end
-                r_l = R'*H(1:3,4); %link i-1 to i
-                p_dot_dot = R'*p_dot_dot_pre+cross(w_dot,r_l)+cross(w,cross(w, r_l));
-
-                if(joints(i) == "Prismatic")
-                    p_dot_dot = p_dot_dot + (R'*q_dot_dot(i)*Zo + cross( 2*q_dot(i)*w, R'*Zo));
+                if(joints(i-1) == "Revolut")
+                    partial(4:6,i-1) = cross(H_pre(1:3,3), P_li - H_pre(1:3,4));
+                    partial(1:3,i-1) = H_pre(1:3,3);
+                else
+                    partial(4:6,i-1) = H_pre(1:3,3);
                 end
 
-                p_dot_dot_c = p_dot_dot + cross(w_dot, r_c(i,1:3)') + cross(w, cross(w,r_c(i,1:3)'));
-
-                p_dot_dot_c_app(:,:,i) = p_dot_dot_c;
-                w_app(:,:,i) = w;
-                w_dot_app(:,:,i) = w_dot;
-
-                w_pre = w;
-                p_dot_dot_pre = p_dot_dot;
-            end
-        end
-
-        function tourqes = backwardEquation(obj, masses, p_dot_dot_c,w,w_dot, f_e, mu_e, joints, lengths)
-            he = [f_e;mu_e];
-            f_next = f_e;
-            mu_next = mu_e;
-            tourqes = sym(zeros(size(joints,2),1));
-            Zo = [0;0;1];
-
-            r_c = [
-                [-lengths(1,3)/2,0,0];
-                [0,0,-lengths(2,3)/2];
-                [0,0,-lengths(3,3)/2];
-                ];
-
-            for i = size(joints,2):-1:1
-                H = (obj.dhMatrixGenerator(obj.DH_table, i)*obj.dhMatrixGenerator(obj.DH_table, i+1));
-                R = H(1:3,1:3);
-
-                r_l = R'*H(1:3,4); %link i-1 to i
-                
-                f = R*f_next+masses(i)*p_dot_dot_c(:,:,i);
-
-                if joints(i) == "Revolut"
-                    Isym = obj.cylinderInertia(lengths(i,1), lengths(i,2), lengths(i,3), masses(i));
-                elseif joints(i) == "Prismatic"
-                    Isym = obj.rectangleInertia(lengths(i,1),lengths(i,2), lengths(i,3), masses(i));
-                end
-                I = obj.translateInertia(Isym, masses(i), (-lengths(i,3)/2));
-                mu = cross(-f, r_l+r_c(i,1:3)') + R*mu_next + cross(R*f_next, r_c(i,1:3)') + I*w_dot(:,:,i) + cross(w(:,:,i),I*w(:,:,i));
-
-                 if joints(i) == "Revolut"
-                    tourqes(i) = f'*R'*Zo;
-                elseif joints(i) == "Prismatic"
-                    tourqes(i) = mu'*R'*Zo;
-                 end
-
-                 mu_next = mu;
-                 f_next = f;
             end
         end
     end
