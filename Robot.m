@@ -82,7 +82,7 @@ classdef Robot
         end
 
         function test(obj, robot)
-           q_values = [2.357, 0.1498, 1.1815];
+           q_values = [0, 0, 0];
            %q_values = [0, 0, 0];
            r1_value = 0.15;
            density = 2700; %Almunium density
@@ -96,16 +96,16 @@ classdef Robot
 
            mass_values = subs(mass_values, [obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3)], [lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3)]);
 
-           q_dot_values = [0,0,0];
-           q_dot_dot_values = [0,0,0];
+           q_dot_values = [1.2,2.3,1.3];
+           q_dot_dot_values = [1.4,3.2,1.3];
            
            g_value = 9.806;
 
            f_e_values = [0;0;0];
            mu_e_values = [0;0;0];
 
-           parameters_old = [obj.masses(1), obj.masses(2), obj.masses(3),obj.g, obj.q(1), obj.q(2), obj.q(3),obj.r1, obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3), obj.q_dot(1),obj.q_dot(2),obj.q_dot(3)];
-           parameters_new  = [mass_values(1), mass_values(2), mass_values(3), g_value, q_values(1),q_values(2),q_values(3),r1_value, lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3),q_dot_values(1),q_dot_values(2),q_dot_values(3)];
+           parameters_old = [obj.masses(1), obj.masses(2), obj.masses(3),obj.g, obj.q(1), obj.q(2), obj.q(3),obj.r1, obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3), obj.q_dot(1),obj.q_dot(2),obj.q_dot(3),obj.q_dot_dot(1),obj.q_dot_dot(2),obj.q_dot_dot(3), obj.f_e(1),obj.f_e(2),obj.f_e(3),obj.mu_e(1),obj.mu_e(2),obj.mu_e(3)];
+           parameters_new  = [mass_values(1), mass_values(2), mass_values(3), g_value, q_values(1),q_values(2),q_values(3),r1_value, lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3),q_dot_values(1),q_dot_values(2),q_dot_values(3),q_dot_dot_values(1),q_dot_dot_values(2),q_dot_dot_values(3), f_e_values(1),f_e_values(2),f_e_values(3), mu_e_values(1),mu_e_values(2), mu_e_values(3)];
 
            disp("q vector: ");
            disp(q_values);
@@ -287,6 +287,27 @@ classdef Robot
            disp(" <<-- Kinetic Energy -->>");
            KE = obj.kineticEnergy(Bq, obj.q_dot);
            disp(double(subs(KE, parameters_old, parameters_new)));
+        
+            disp("<<-- Langrangian Equation -->>");
+            t_lang = obj.equationOfMotionLangrangian();
+            disp(double(subs(t_lang,parameters_old, parameters_new)));
+
+            disp("<<-- Newton Euler -->>");
+            t_NE = obj.equationOfMotionNewtonEuler();
+            disp(double(subs(t_NE,parameters_old, parameters_new)));
+        end
+
+        function EoM = equationOfMotionLangrangian(obj)
+            Bq = obj.inertiaMatrix(obj.DH_table, obj.masses, obj.P_COM, obj.Joints, obj.lengths);
+            C = obj.coriolisMatrix(Bq, obj.q, obj.q_dot);
+            G = obj.gravityMatrix(obj.DH_table, obj.P_COM, obj.Joints, obj.masses, obj.g);
+
+            EoM = Bq*obj.q_dot_dot + C*obj.q_dot + G;
+        end
+
+        function EoM = equationOfMotionNewtonEuler(obj)
+            [w,w_dot, p_dot_dot_c] = obj.forwardEquation(obj.g, obj.DH_table, obj.q_dot, obj.q_dot_dot, obj.P_COM, obj.Joints);
+            EoM = obj.backwordEquation(w,w_dot,p_dot_dot_c, obj.f_e, obj.mu_e, obj.DH_table, obj.P_COM, obj.masses,obj.Joints, obj.lengths);
         end
 
         function demo(obj)
@@ -357,7 +378,11 @@ classdef Robot
             H = sym(eye(4,4));
 
             if(startIndex == endIndex) %if no transformation is needed, use empty homogeneous transformation
-                return
+                return;
+            end
+
+            if(endIndex > 5)
+                return;
             end
 
             for i = startIndex: endIndex-1
@@ -458,6 +483,91 @@ classdef Robot
         
         function KE = kineticEnergy(obj, Bq, q_dot)
             KE = q_dot'*Bq*q_dot;
+        end
+    
+        function C = coriolisMatrix(obj, Bq, q, q_dot)
+            C = sym(zeros(3,3));
+            for i = 1:3
+                for j = 1:3
+                    for k = 1:3
+                        C(i,j) = C(i,j) + (1/2 *(diff(Bq(i,j),q(k))+diff(Bq(i,k),q(j))-diff(Bq(j,k),q(i)))*q_dot(k));
+                    end
+                end
+            end
+        end
+    
+        function [w_app, w_dot_app, p_dot_dot_c_app] = forwardEquation(obj, g, dh_table, q_dot, q_dot_dot,P_COM, joints)
+            w_pre = [0;0;0];
+            w_dot_pre = [0;0;0];
+            p_dot_dot_pre = [0;g;0];
+            
+            Z0 = [0;0;1];
+
+            p_dot_dot_c_app = sym(zeros(3,1,3));
+            w_app = sym(zeros(3,1,3));
+            w_dot_app = sym(zeros(3,1,3));
+
+            for i = 2:4
+                H = obj.getHomogeneousMatrix(dh_table, i,i+1);
+                R = H(1:3,1:3);
+                w = R' * w_pre;
+                w_dot = R' * w_dot_pre;
+                if(joints(i-1) == "Revolut")
+                    w = w + R'*q_dot(i-1)*Z0;
+                    w_dot = w_dot + R' * (q_dot_dot(i-1)*Z0 + cross(q_dot(i-1)*w_pre, Z0));
+                end
+                rlink = R' * H(1:3,4);
+                p_dot_dot = R' * p_dot_dot_pre + cross(w_dot, rlink) + cross(w,cross(w,rlink));
+                if(joints(i-1) == "Prismatic")
+                    p_dot_dot = p_dot_dot + R' * q_dot_dot(i-1)*Z0 + cross(2*q_dot(i-1)*w,R'*Z0);
+                end
+                p_dot_dot_c = p_dot_dot + cross(w_dot,P_COM(i-1,1:3)') + cross(w,cross(w,P_COM(i-1,1:3)'));
+
+                %appending the results
+                p_dot_dot_c_app(:,:,i-1) = p_dot_dot_c;
+                w_dot_app(:,:,i-1) = w_dot;
+                w_app(:,:,i-1) = w;
+
+                %replacing old with new
+                w_pre = w;
+                w_dot_pre = w_dot;
+                p_dot_dot_pre = p_dot_dot;
+            end
+        end
+        
+        function tourqe = backwordEquation(obj, w,w_dot,p_dot_dot_c, f_e, mu_e, dh_table, P_COM, masses, joints, lengths)
+            f_next =f_e;
+            mu_next = mu_e;
+            Z0 = [0;0;1];
+
+            for i = 5:-1:3
+                H = obj.getHomogeneousMatrix(dh_table, i,i+1);
+                R = H(1:3,1:3);
+
+                H_m_1 = obj.getHomogeneousMatrix(dh_table, i-1,i);
+                R_m_1 = H_m_1(1:3,1:3);
+
+                rlink = R_m_1' * H_m_1(1:3,4);
+                f = R*f_next + masses(i-2) * p_dot_dot_c(:,:,i-2);
+
+                if(joints(i-2) == "Revolut")
+                    Ic = obj.inertiaCylender(lengths(i-2,1),lengths(i-2,2),lengths(i-2,3),masses(i-2));
+                else
+                    Ic = obj.inertiaCube(lengths(i-2,1),lengths(i-2,2),lengths(i-2,3),masses(i-2));
+                end
+                I = obj.translateInertia(Ic, masses(i-2),P_COM(i-2,:)');
+
+                mu = -cross(f,rlink + P_COM(i-2,:)') + R*mu_next + cross(R*f_next,P_COM(i-2,:)') + I*w_dot(:,:,i-2) + cross(w(:,:,i-2),I*w(:,:,i-2));
+
+                if(joints(i-2) == "Prismatic")
+                    tourqe(i-2) = f' * R_m_1'*Z0;
+                else
+                    tourqe(i-2) = mu' * R_m_1'*Z0;
+                end
+
+                f_next = f;
+                mu_next = mu;
+            end
         end
     end
 end
