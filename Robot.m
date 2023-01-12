@@ -104,8 +104,8 @@ classdef Robot
            f_e_values = [0;0;0];
            mu_e_values = [0;0;0];
 
-           parameters_old = [obj.masses(1), obj.masses(2), obj.masses(3),obj.g, obj.q(1), obj.q(2), obj.q(3),obj.r1, obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3)];
-           parameters_new  = [mass_values(1), mass_values(2), mass_values(3), g_value, q_values(1),q_values(2),q_values(3),r1_value, lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3)];
+           parameters_old = [obj.masses(1), obj.masses(2), obj.masses(3),obj.g, obj.q(1), obj.q(2), obj.q(3),obj.r1, obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3), obj.q_dot(1),obj.q_dot(2),obj.q_dot(3)];
+           parameters_new  = [mass_values(1), mass_values(2), mass_values(3), g_value, q_values(1),q_values(2),q_values(3),r1_value, lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3),q_dot_values(1),q_dot_values(2),q_dot_values(3)];
 
            disp("q vector: ");
            disp(q_values);
@@ -262,6 +262,31 @@ classdef Robot
            gravityPotential = obj.gravityMatrix(obj.DH_table, obj.P_COM, obj.Joints, obj.masses, obj.g);
            disp(double(subs(gravityPotential,  parameters_old, parameters_new)));
 
+           disp("<<-- Inertia Matrix -->>");
+           Bq = obj.inertiaMatrix(obj.DH_table, obj.masses, obj.P_COM, obj.Joints, obj.lengths);
+           Bq_solve = double(subs(Bq, parameters_old, parameters_new));
+           disp(Bq_solve);
+
+           if(Bq_solve == Bq_solve')
+               disp("Bq matrix is skew-symetric!");
+           else
+               disp("Bq matrix is not skew-symetric!");
+           end
+
+           eig_vals = eig(Bq_solve);
+           disp("Eigen Values:");
+           disp(eig_vals);
+
+           is_pd = [sum([sign(eig_vals)==1])==length(Bq_solve)];
+           if is_pd ==1 
+                disp("Bq is Positive Definite")
+           else 
+                disp("Bq isn't Positive Definite")
+           end
+
+           disp(" <<-- Kinetic Energy -->>");
+           KE = obj.kineticEnergy(Bq, obj.q_dot);
+           disp(double(subs(KE, parameters_old, parameters_new)));
         end
 
         function demo(obj)
@@ -394,6 +419,45 @@ classdef Robot
                     G(i-1,1) = G(i-1,1) + (-masses(j-1)*gvec'*Jp(4:6, i-1));
                 end
             end
+        end
+    
+        function Bq = inertiaMatrix(obj, dh_table, masses, P_COM, joints, lengths)
+            Bq = 0;
+            for i=2:4
+                H = obj.getHomogeneousMatrix(dh_table, 2, i+1);
+                J = obj.partialJacobian(dh_table, P_COM, joints, i);
+                if(joints(i-1) == "Revolut")
+                    Ic = obj.inertiaCylender(lengths(i-1,1),lengths(i-1,2),lengths(i-1,3),masses(i-1));
+                else
+                    Ic = obj.inertiaCube(lengths(i-1,1),lengths(i-1,2),lengths(i-1,3),masses(i-1));
+                end
+                I = obj.translateInertia(Ic, masses(i-1),P_COM(i-1,:)');
+                Bq = Bq + (masses(i-1)*J(4:6,:)'*J(4:6,:)+ J(1:3,:)'*H(1:3,1:3)*I*H(1:3,1:3)'*J(1:3,:));
+            end
+        end
+
+        function Ic = inertiaCylender(obj, a,b,c,m)
+            Ic = [
+                [1/2*m*(a^2+b^2),0,0];
+                [0,1/2*m*(3*(a^2+b^2)^2 + c^2),0];
+                [0,0,1/2*m*(3*(a^2+b^2)^2 + c^2)]
+            ];
+        end
+
+        function Ic = inertiaCube(obj, a,b,c,m)
+            Ic = [
+                [1/12*m*(b^2+a^2),0,0];
+                [0,1/12*m*(a^2+c^2),0];
+                [0,0,1/12*m*(c^2+b^2)]
+            ];
+        end
+
+        function I = translateInertia(obj, Ic, m,r)
+            I = Ic + m*(r'*r*eye(3,3)-r*r');
+        end
+        
+        function KE = kineticEnergy(obj, Bq, q_dot)
+            KE = q_dot'*Bq*q_dot;
         end
     end
 end
