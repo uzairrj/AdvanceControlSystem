@@ -86,7 +86,7 @@ classdef Robot
            %q_values = [0, 0, 0];
            r1_value = 0.15;
            density = 2700; %Almunium density
-           mass_values = [obj.lengths(1,1)*obj.lengths(1,2)*obj.lengths(1,3)*density, obj.lengths(2,1)*obj.lengths(2,2)*obj.lengths(3,3)*density, obj.lengths(3,1)*obj.lengths(3,2)*obj.lengths(3,3)*density];
+           mass_values = [pi * obj.lengths(1,1)^2*obj.lengths(1,3)*density, obj.lengths(2,1)*obj.lengths(2,2)*obj.lengths(3,3)*density, obj.lengths(3,1)^2*obj.lengths(3,3)*density];
            
            lenghts_values = [
                [0.02, 0.1256, 0.4]; 
@@ -96,8 +96,8 @@ classdef Robot
 
            mass_values = subs(mass_values, [obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3)], [lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3)]);
 
-           q_dot_values = [1.2,2.3,1.3];
-           q_dot_dot_values = [1.4,3.2,1.3];
+           q_dot_values = [0,0,0];
+           q_dot_dot_values = [0,0,0];
            
            g_value = 9.806;
 
@@ -307,7 +307,7 @@ classdef Robot
 
         function EoM = equationOfMotionNewtonEuler(obj)
             [w,w_dot, p_dot_dot_c] = obj.forwardEquation(obj.g, obj.DH_table, obj.q_dot, obj.q_dot_dot, obj.P_COM, obj.Joints);
-            EoM = obj.backwordEquation(w,w_dot,p_dot_dot_c, obj.f_e, obj.mu_e, obj.DH_table, obj.P_COM, obj.masses,obj.Joints, obj.lengths);
+            EoM = obj.backwordEquation(w,w_dot,p_dot_dot_c, obj.f_e, obj.mu_e, obj.DH_table, obj.P_COM, obj.masses,obj.Joints, obj.lengths)';
         end
 
         function demo(obj)
