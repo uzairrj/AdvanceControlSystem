@@ -5,9 +5,10 @@ classdef Robot
         Joints;
         GeometricalJacobianMatrix;
         AnalyticalJacobianMatrix;
+        AnalyticalJacobianMatrixComplete;
     end
     properties (Access = private)
-        r1,inertia_vars,q, q_dot, q_dot_dot, masses, lengths, g, f_e, mu_e, P_COM;
+        r1,inertia_vars,q, q_dot, q_dot_dot, masses, lengths, g, f_e, mu_e, P_COM, phi;
     end
     methods
         %%Default constructor
@@ -21,6 +22,9 @@ classdef Robot
             obj.lengths = [[sym("a1"),sym("b1"),sym("c1")];
                             [sym("a2"),sym("b2"),sym("c2")];
                             [sym("a3"),sym("b3"),sym("c3")]];
+
+            obj.phi = [ sym("phi1"), sym("phi2"), sym("phi3")];
+
             obj.P_COM = [
                 [-obj.lengths(1,3)/2,0,0];
                 [0,0,-obj.lengths(2,3)/2];
@@ -44,6 +48,8 @@ classdef Robot
              obj.GeometricalJacobianMatrix = obj.generateJacobianMatrix(obj.DH_table,obj.Joints, 3);
 
              obj.AnalyticalJacobianMatrix = obj.generateAnalyticalJacobianMatrix(obj.TransoformationMatrix(1:3,4),obj.q);
+
+             obj.AnalyticalJacobianMatrixComplete = obj.generateAnalyticalJacobianComplete(obj.GeometricalJacobianMatrix);
         end
 
         function kinematics = directKinematics(obj, t_1, d_1, t_2)
@@ -82,7 +88,7 @@ classdef Robot
         end
 
         function test(obj, robot)
-           q_values = [0, 0, 0];
+           q_values = [1.34, 2.34, 0.66];
            %q_values = [0, 0, 0];
            r1_value = 0.15;
            density = 2700; %Almunium density
@@ -134,8 +140,11 @@ classdef Robot
            disp("Geometrical Jacobian Ours: ");
            disp(obj.solveGeometricalJacobianMatrix(q_values(1),q_values(2),q_values(3)));
 
-           disp("Analytical Jacobian Ours: ");
+           disp("Analytical Jacobian Ours (3x3): ");
            disp(obj.solveAnalyticalJacobianMatrix(q_values(1),q_values(2),q_values(3)));
+
+           disp("Analytical Jacobian Ours: (6x3): ");
+           disp(obj.solveAnalyticalJacobianComplete(q_values(1),q_values(2),q_values(3)));
 
            disp("<<-- Testing Homogenous Transformations -->>")
 
@@ -310,9 +319,48 @@ classdef Robot
             EoM = obj.backwordEquation(w,w_dot,p_dot_dot_c, obj.f_e, obj.mu_e, obj.DH_table, obj.P_COM, obj.masses,obj.Joints, obj.lengths)';
         end
 
-        function demo(obj)
+        function res = solveAnalyticalJacobianComplete(obj, t_1, d_1, t_2)
+             analyticalJacobian = obj.AnalyticalJacobianMatrixComplete;
+            x = obj.TransoformationMatrix;
+
+            rotMatrix = double(subs(x, [obj.r1,obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3),obj.q(1), obj.q(3),obj.q(2)], [0.15, 0.4, 0.3, 0.16, t_1,t_2, d_1]));
+            phi2 = rotm2eul(rotMatrix(1:3,1:3),"ZYZ");
+
+            res = double(subs(analyticalJacobian, [obj.phi(1),obj.phi(2),obj.phi(3),obj.r1,obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3),obj.q(1), obj.q(3),obj.q(2)], [phi2(1),phi2(2),phi2(3),0.15, 0.4, 0.3, 0.16, t_1,t_2, d_1]));
+
+        end
+
+        function analyticalJacobian = generateAnalyticalJacobianComplete(obj, J)
             
-           
+            Rx = [[1,0,0];
+                  [0, cos(obj.phi(1)), -sin(obj.phi(1))];
+                  [0,sin(obj.phi(1)),cos(obj.phi(1))]];
+            Rz = [[cos(obj.phi(2)), -sin(obj.phi(2)), 0];
+                  [sin(obj.phi(2)), cos(obj.phi(2)), 0];
+                  [0,0,1]];
+            Rx2 = [[1,0,0];
+                  [0, cos(obj.phi(3)), -sin(obj.phi(3))];
+                  [0,sin(obj.phi(3)),cos(obj.phi(3))]];
+
+            Rxz = Rx*Rz;
+            Rxzx = Rxz*Rx2;
+            T = [Rx(1:3,1),Rxz(1:3,3),Rxzx(1:3,1)];
+
+            Ta = [[eye(3),zeros(3)];
+                  [eye(3), T]];
+            Jac = sym(zeros(6,3));
+            Jac(1:3,1:3) = J(4:6, 1:3);
+            Jac(4:6,1:3) = J(1:3,1:3);
+
+            res  = Ta \ Jac;
+
+            analyticalJacobian = sym(zeros(6,3));
+
+            analyticalJacobian(1:3,1:3) = res(4:6,:);
+            analyticalJacobian(4:6,:) = res(1:3,:);
+        end
+
+        function demo(obj)
         end
     end
     methods (Access = private)
