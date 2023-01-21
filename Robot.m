@@ -330,36 +330,6 @@ classdef Robot
 
         end
 
-        function analyticalJacobian = generateAnalyticalJacobianComplete(obj, J)
-            
-            Rx = [[1,0,0];
-                  [0, cos(obj.phi(1)), -sin(obj.phi(1))];
-                  [0,sin(obj.phi(1)),cos(obj.phi(1))]];
-            Rz = [[cos(obj.phi(2)), -sin(obj.phi(2)), 0];
-                  [sin(obj.phi(2)), cos(obj.phi(2)), 0];
-                  [0,0,1]];
-            Rx2 = [[1,0,0];
-                  [0, cos(obj.phi(3)), -sin(obj.phi(3))];
-                  [0,sin(obj.phi(3)),cos(obj.phi(3))]];
-
-            Rxz = Rx*Rz;
-            Rxzx = Rxz*Rx2;
-            T = [Rx(1:3,1),Rxz(1:3,3),Rxzx(1:3,1)];
-
-            Ta = [[eye(3),zeros(3)];
-                  [eye(3), T]];
-            Jac = sym(zeros(6,3));
-            Jac(1:3,1:3) = J(4:6, 1:3);
-            Jac(4:6,1:3) = J(1:3,1:3);
-
-            res  = Ta \ Jac;
-
-            analyticalJacobian = sym(zeros(6,3));
-
-            analyticalJacobian(1:3,1:3) = res(4:6,:);
-            analyticalJacobian(4:6,:) = res(1:3,:);
-        end
-
         function demo(obj)
         end
     end
@@ -616,6 +586,36 @@ classdef Robot
                 f_next = f;
                 mu_next = mu;
             end
+        end
+    
+        function analyticalJacobian = generateAnalyticalJacobianComplete(obj, J)
+            
+            Rx = [[1,0,0];
+                  [0, cos(obj.phi(1)), -sin(obj.phi(1))];
+                  [0,sin(obj.phi(1)),cos(obj.phi(1))]];
+            Rz = [[cos(obj.phi(2)), -sin(obj.phi(2)), 0];
+                  [sin(obj.phi(2)), cos(obj.phi(2)), 0];
+                  [0,0,1]];
+            Rx2 = [[1,0,0];
+                  [0, cos(obj.phi(3)), -sin(obj.phi(3))];
+                  [0,sin(obj.phi(3)),cos(obj.phi(3))]];
+
+            Rxz = Rx*Rz;
+            Rxzx = Rxz*Rx2;
+            T = [Rx(1:3,1),Rxz(1:3,3),Rxzx(1:3,1)];
+
+            Ta = [[eye(3),zeros(3)];
+                  [eye(3), T]];
+            Jac = sym(zeros(6,3));
+            Jac(1:3,1:3) = J(4:6, 1:3);
+            Jac(4:6,1:3) = J(1:3,1:3);
+
+            res  = Ta \ Jac;
+
+            analyticalJacobian = sym(zeros(6,3));
+
+            analyticalJacobian(1:3,1:3) = res(4:6,:);
+            analyticalJacobian(4:6,:) = res(1:3,:);
         end
     end
 end
