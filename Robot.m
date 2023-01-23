@@ -417,6 +417,8 @@ classdef Robot
 
             matrix = matrix * rotationHomogeneousMatrix;
             end
+
+            matrix = simplify(matrix);
         end
 
         function jacobianMatrix = generateJacobianMatrix(obj, dh_table,joints, index)
@@ -434,6 +436,8 @@ classdef Robot
                 end
                 matrix = matrix * obj.dhMatrixGenerator(dh_table,i+1);
             end
+
+            jacobianMatrix = simplify(jacobianMatrix);
         end
 
         function analyticalJacobianMatrix = generateAnalyticalJacobianMatrix(~,pe,q)
@@ -444,6 +448,8 @@ classdef Robot
                    analyticalJacobianMatrix(j,i) = diff(pe(j),q(i));
                end
             end
+
+            analyticalJacobianMatrix = simplify(analyticalJacobianMatrix);
         end
 
         %1 is the base frame
@@ -472,6 +478,8 @@ classdef Robot
 
             H = H * rotationHomogeneousMatrix;
             end
+
+            H = simplify(H);
         end
 
         %index 1 is base, but in this the base is transfered to link 1 so
@@ -492,6 +500,7 @@ classdef Robot
                 end
 
             end
+            partial = simplify(partial);
         end
     
         function PE = potentialEnergy(obj, masses, dh_table, CoM, g)
@@ -502,10 +511,13 @@ classdef Robot
                 Pl = H(1:3,1:3)*CoM(i-1,:)'+H(1:3,4);
                 PE = PE + (-masses(i-1)*gvec'*Pl);
             end
+            
+            PE = simplify(PE);
         end
 
-        function G = gravityMatrixDrifferential(obj, U, q)
+        function G = gravityMatrixDrifferential(~, U, q)
             G = [diff(U,q(1)); diff(U,q(2)); diff(U,q(3))];
+            G = simplify(G);
         end
 
         function G = gravityMatrix(obj, dh_table, P_COM, joints, masses, g)
@@ -532,6 +544,8 @@ classdef Robot
                 I = obj.translateInertia(Ic, masses(i-1),P_COM(i-1,:)');
                 Bq = Bq + (masses(i-1)*J(4:6,:)'*J(4:6,:)+ J(1:3,:)'*H(1:3,1:3)*I*H(1:3,1:3)'*J(1:3,:));
             end
+            
+            Bq = simplify(Bq);
         end
 
         function Ic = inertiaCylender(obj, a,b,c,m)
@@ -567,6 +581,7 @@ classdef Robot
                     end
                 end
             end
+            C = simplify(C);
         end
     
         function [w_app, w_dot_app, p_dot_dot_c_app] = forwardEquation(obj, g, dh_table, q_dot, q_dot_dot,P_COM, joints)
@@ -661,6 +676,8 @@ classdef Robot
 
             analyticalJacobian(1:3,:) = res(4:6,:);
             analyticalJacobian(4:6,:) = res(1:3,:);
+
+            Ta = simplify(Ta);
         end
         
         function [Ba, Ca, Ga] = operationalSpaceDynamicModel(obj, Ja, B, C, G, h, he, q, q_dot)
