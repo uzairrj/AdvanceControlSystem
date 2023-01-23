@@ -49,7 +49,7 @@ classdef Robot
 
              obj.AnalyticalJacobianMatrix = obj.generateAnalyticalJacobianMatrix(obj.TransoformationMatrix(1:3,4),obj.q);
 
-             obj.AnalyticalJacobianMatrixComplete = obj.generateAnalyticalJacobianComplete(obj.GeometricalJacobianMatrix);
+             [~,obj.AnalyticalJacobianMatrixComplete] = obj.generateAnalyticalJacobianComplete(obj.GeometricalJacobianMatrix);
         end
 
         function kinematics = directKinematics(obj, t_1, d_1, t_2)
@@ -320,7 +320,7 @@ classdef Robot
         end
 
         function res = solveAnalyticalJacobianComplete(obj, t_1, d_1, t_2)
-             analyticalJacobian = obj.AnalyticalJacobianMatrixComplete;
+            analyticalJacobian = obj.AnalyticalJacobianMatrixComplete;
             x = obj.TransoformationMatrix;
 
             rotMatrix = double(subs(x, [obj.r1,obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3),obj.q(1), obj.q(3),obj.q(2)], [0.15, 0.4, 0.3, 0.16, t_1,t_2, d_1]));
@@ -331,6 +331,61 @@ classdef Robot
         end
 
         function demo(obj)
+            q_values = [1.34, 2.34, 0.66];
+           %q_values = [0, 0, 0];
+           r1_value = 0.15;
+           density = 2700; %Almunium density
+           mass_values = [pi * obj.lengths(1,1)^2*obj.lengths(1,3)*density, obj.lengths(2,1)*obj.lengths(2,2)*obj.lengths(3,3)*density, obj.lengths(3,1)^2*obj.lengths(3,3)*density];
+           
+           lenghts_values = [
+               [0.02, 0.1256, 0.4]; 
+               [0.03, 0.03, 0.3]; 
+               [0.02, 0.1256, 0.16]
+               ];
+
+           mass_values = subs(mass_values, [obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3)], [lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3)]);
+
+           q_dot_values = [0,0,0];
+           q_dot_dot_values = [0,0,0];
+           
+           g_value = 9.806;
+
+           f_e_values = [0;0;0];
+           mu_e_values = [0;0;0];
+
+            X_dot_dot = [sym("x_dot_dot1");sym("x_dot_dot2");sym("x_dot_dot3")];
+
+            x_dot_dot_valyes = [0;0;0;];
+
+            phi_vals = [0;0;0];
+
+           parameters_old = [obj.lengths(1,:), obj.lengths(2,:) , obj.lengths(3,:), obj.masses, obj.g];
+           parameters_new  = [lenghts_values(1,:),lenghts_values(2,:),lenghts_values(3,:), mass_values, g_value];
+
+            Bq = obj.inertiaMatrix(obj.DH_table, obj.masses, obj.P_COM, obj.Joints, obj.lengths);
+            C = obj.coriolisMatrix(Bq, obj.q, obj.q_dot);
+            G = obj.gravityMatrix(obj.DH_table, obj.P_COM, obj.Joints, obj.masses, obj.g);
+
+            Bq = simplify(subs(Bq, parameters_old, parameters_new));
+            C = simplify(subs(C, parameters_old, parameters_new));
+            G = simplify(subs(G, parameters_old, parameters_new));
+
+            [Ba, Ca, Ga] = obj.operationalSpaceDynamicModel(obj.AnalyticalJacobianMatrixComplete, Bq,C,G, obj.f_e, obj.mu_e, obj.q, obj.q_dot);
+
+            Y = Ba*[X_dot_dot;obj.phi'] + Ca + Ga;
+
+            x = obj.getHomogeneousMatrix(obj.DH_table, 2, 5);
+            
+            x = subs(x, obj.q,q_values');
+
+            rotMatrix = double(subs(x, parameters_old,parameters_new));
+            phi2 = rotm2eul(rotMatrix(1:3,1:3),"ZYZ");
+
+            Y_res = subs(Y,parameters_old,parameters_new);
+
+            p = double(subs(Y_res, [obj.phi(1),obj.phi(2),obj.phi(3)], [phi2(1),phi2(2),phi2(3)]));
+
+
         end
     end
     methods (Access = private)
@@ -588,34 +643,46 @@ classdef Robot
             end
         end
     
-        function analyticalJacobian = generateAnalyticalJacobianComplete(obj, J)
+        function [Ta, analyticalJacobian] = generateAnalyticalJacobianComplete(obj, J)
             
-            Rx = [[1,0,0];
-                  [0, cos(obj.phi(1)), -sin(obj.phi(1))];
-                  [0,sin(obj.phi(1)),cos(obj.phi(1))]];
-            Rz = [[cos(obj.phi(2)), -sin(obj.phi(2)), 0];
-                  [sin(obj.phi(2)), cos(obj.phi(2)), 0];
-                  [0,0,1]];
-            Rx2 = [[1,0,0];
-                  [0, cos(obj.phi(3)), -sin(obj.phi(3))];
-                  [0,sin(obj.phi(3)),cos(obj.phi(3))]];
+            T = [[0, -sin(obj.phi(1)), cos(obj.phi(1))*sin(obj.phi(2))];
+                 [0, cos(obj.phi(1)), sin(obj.phi(1))*sin(obj.phi(2))];
+                 [1,0,cos(obj.phi(2))]];
 
-            Rxz = Rx*Rz;
-            Rxzx = Rxz*Rx2;
-            T = [Rx(1:3,1),Rxz(1:3,3),Rxzx(1:3,1)];
-
-            Ta = [[eye(3),zeros(3)];
-                  [eye(3), T]];
+            Ta = simplify([eye(3) zeros(3);
+                  zeros(3) T]);
             Jac = sym(zeros(6,3));
             Jac(1:3,1:3) = J(4:6, 1:3);
             Jac(4:6,1:3) = J(1:3,1:3);
 
-            res  = Ta \ Jac;
+            res  = simplify(Ta \ Jac);
 
             analyticalJacobian = sym(zeros(6,3));
 
-            analyticalJacobian(1:3,1:3) = res(4:6,:);
+            analyticalJacobian(1:3,:) = res(4:6,:);
             analyticalJacobian(4:6,:) = res(1:3,:);
+        end
+        
+        function [Ba, Ca, Ga] = operationalSpaceDynamicModel(obj, Ja, B, C, G, h, he, q, q_dot)
+            analyticalJacobian = sym(zeros(6,3));
+            analyticalJacobian(1:3,:) = Ja(4:6,:);
+            analyticalJacobian(4:6,:) = Ja(1:3,:);
+
+            Ja_inv_T = pinv(analyticalJacobian');
+
+            time = sym("t");
+            q_time = [symfun("q1(t)", time); symfun("q2(t)", time); symfun("q3(t)", time)];
+            q_time_dot = diff(q_time);
+
+            J_dot = subs(analyticalJacobian, q, q_time);
+            J_dot = diff(J_dot);
+
+            J_dot = subs(J_dot, [q_time_dot; q_time], [q_dot; q]);
+
+            B = simplify(B);
+            Ba = Ja_inv_T * B * pinv(analyticalJacobian);
+            Ca = ((Ja_inv_T * C) - Ba *J_dot)*q_dot;
+            Ga = Ja_inv_T * G;
         end
     end
 end
