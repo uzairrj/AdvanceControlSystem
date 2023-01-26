@@ -8,27 +8,29 @@ classdef Robot
         AnalyticalJacobianMatrixComplete;
     end
     properties (Access = private)
-        r1,inertia_vars,q, q_dot, q_dot_dot, masses, lengths, g, f_e, mu_e, P_COM, phi;
+        r1,inertia_vars,q, q_dot, q_dot_dot, masses, lengths, g, f_e, mu_e, P_COM, phi, x_dot_dot;
     end
     methods
         %%Default constructor
         function obj = Robot()
-            obj.r1 = sym("r1"); %base frame r in z axix
-            obj.g = sym("g");
-            obj.q = [[sym("q1")]; [sym("q2")]; [sym("q3")];];
-            obj.q_dot = [[sym("q1_dot")]; [sym("q2_dot")]; [sym("q3_dot")];];
-            obj.q_dot_dot = [[sym("q1_dot_dot")]; [sym("q2_dot_dot")]; [sym("q3_dot_dot")];];
-            obj.masses = [sym("m1"), sym("m2"), sym("m3")];
-            obj.lengths = [[sym("a1"),sym("b1"),sym("c1")];
-                            [sym("a2"),sym("b2"),sym("c2")];
-                            [sym("a3"),sym("b3"),sym("c3")]];
+            obj.r1 = sym("r1",'real'); %base frame r in z axix
+            obj.g = sym("g",'real');
+            obj.q = [sym("q1",'real'); sym("q2",'real'); sym("q3",'real')];
+            obj.q_dot = [sym("q1_dot",'real'); sym("q2_dot",'real'); sym("q3_dot",'real')];
+            obj.q_dot_dot = [sym("q1_dot_dot",'real'); sym("q2_dot_dot",'real'); sym("q3_dot_dot",'real')];
+            obj.masses = [sym("m1",'real'), sym("m2",'real'), sym("m3",'real')];
+            obj.lengths = [[sym("a1",'real'),sym("b1",'real'),sym("c1",'real')];
+                            [sym("a2",'real'),sym("b2",'real'),sym("c2",'real')];
+                            [sym("a3",'real'),sym("b3",'real'),sym("c3",'real')]];
 
-            obj.phi = [ sym("phi1"), sym("phi2"), sym("phi3")];
+            obj.phi = [ sym("phi1",'real'), sym("phi2",'real'), sym("phi3",'real')];
+
+            obj.x_dot_dot = [sym("x_dot_dot",'real');sym("y_dot_dot",'real'); sym("z_dot_dot",'real'); sym("phi1_dot_dot",'real');sym("phi2_dot_dot",'real');sym("phi3_dot_dot",'real') ];
 
             obj.P_COM = [
                 [-obj.lengths(1,3)/2,0,0];
                 [0,0,-obj.lengths(2,3)/2];
-                [0,0,-obj.lengths(3,3)/2];]
+                [0,0,-obj.lengths(3,3)/2];];
 
             obj.Joints = ["Revolut","Prismatic","Revolut"];
 
@@ -40,8 +42,8 @@ classdef Robot
                 [obj.r1,0,obj.lengths(2,3)+obj.q(2),0];
                 ];
 
-             obj.f_e = [sym("fex");sym("fey");sym("fez")];
-             obj.mu_e = [sym("muex");sym("muey");sym("muez")];
+             obj.f_e = [sym("fex",'real');sym("fey",'real');sym("fez",'real')];
+             obj.mu_e = [sym("muex",'real');sym("muey",'real');sym("muez",'real')];
 
              obj.TransoformationMatrix = obj.getTransformationMatrix(obj.DH_table, 4);
 
@@ -102,8 +104,8 @@ classdef Robot
 
            mass_values = subs(mass_values, [obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3)], [lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3)]);
 
-           q_dot_values = [0,0,0];
-           q_dot_dot_values = [0,0,0];
+           q_dot_values = [1.23,2.22,1.23];
+           q_dot_dot_values = [3.3,3.0,3.3];
            
            g_value = 9.806;
 
@@ -330,10 +332,10 @@ classdef Robot
 
         end
 
-        function demo(obj)
-            q_values = [1.34, 2.34, 0.66];
-           %q_values = [0, 0, 0];
-           r1_value = 0.15;
+        function testOperationalSpace(obj)
+           q_values = [1.34; 2.34; 0.66];
+           %q_values = [0; 0; 0];
+
            density = 2700; %Almunium density
            mass_values = [pi * obj.lengths(1,1)^2*obj.lengths(1,3)*density, obj.lengths(2,1)*obj.lengths(2,2)*obj.lengths(3,3)*density, obj.lengths(3,1)^2*obj.lengths(3,3)*density];
            
@@ -345,46 +347,55 @@ classdef Robot
 
            mass_values = subs(mass_values, [obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3)], [lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3)]);
 
-           q_dot_values = [0,0,0];
-           q_dot_dot_values = [0,0,0];
+           q_dot_values = [0;0;0];
+           q_dot_dot_values = [0;0;0];
            
            g_value = 9.806;
 
            f_e_values = [0;0;0];
            mu_e_values = [0;0;0];
 
-            X_dot_dot = [sym("x_dot_dot1");sym("x_dot_dot2");sym("x_dot_dot3")];
 
-            x_dot_dot_valyes = [0;0;0;];
+            
 
-            phi_vals = [0;0;0];
+            x = obj.getHomogeneousMatrix(obj.DH_table, 2, 5);
 
-           parameters_old = [obj.lengths(1,:), obj.lengths(2,:) , obj.lengths(3,:), obj.masses, obj.g];
-           parameters_new  = [lenghts_values(1,:),lenghts_values(2,:),lenghts_values(3,:), mass_values, g_value];
+            rotMatrix = double(subs(x, [obj.r1,obj.lengths(1,3),obj.lengths(2,3),obj.lengths(3,3),obj.q(1), obj.q(3),obj.q(2)], [0.15, 0.4, 0.3, 0.16, q_values(1),q_values(2), q_values(3)]));
+            phi_vals = rotm2eul(rotMatrix(1:3,1:3),"ZYZ");
+
+            x_dot_dot_valyes = [0;0;0;0;0;0];
+
+           parameters_old = [obj.lengths(1,:), obj.lengths(2,:) , obj.lengths(3,:), obj.masses, obj.g, obj.q', obj.q_dot', obj.q_dot_dot', obj.phi, obj.x_dot_dot'];
+           parameters_new  = [lenghts_values(1,:),lenghts_values(2,:),lenghts_values(3,:), mass_values, g_value, q_values', q_dot_values', q_dot_dot_values',phi_vals, x_dot_dot_valyes'];
 
             Bq = obj.inertiaMatrix(obj.DH_table, obj.masses, obj.P_COM, obj.Joints, obj.lengths);
             C = obj.coriolisMatrix(Bq, obj.q, obj.q_dot);
             G = obj.gravityMatrix(obj.DH_table, obj.P_COM, obj.Joints, obj.masses, obj.g);
 
-            Bq = simplify(subs(Bq, parameters_old, parameters_new));
-            C = simplify(subs(C, parameters_old, parameters_new));
-            G = simplify(subs(G, parameters_old, parameters_new));
+            GeoJacob = obj.generateGeometricalJacobianFromFirstJoint(obj.DH_table, obj.Joints, 4);
+            [Ta, AnalJacob] = obj.generateAnalyticalJacobianComplete(GeoJacob);
+            [Ba, Ca, Ga] = obj.operationalSpaceDynamicModel(AnalJacob, Bq,C,G, obj.q, obj.q_dot);
 
-            [Ba, Ca, Ga] = obj.operationalSpaceDynamicModel(obj.AnalyticalJacobianMatrixComplete, Bq,C,G, obj.f_e, obj.mu_e, obj.q, obj.q_dot);
+           % Ba_solved = double(subs(Ba, parameters_old, parameters_new));
+           % Ca_solved = double(subs(Ca, parameters_old, parameters_new));
+           % Ga_solved = double(subs(Ga, parameters_old, parameters_new));
 
-            Y = Ba*[X_dot_dot;obj.phi'] + Ca + Ga;
+            ya = Ba*obj.x_dot_dot + Ca + Ga;
 
-            x = obj.getHomogeneousMatrix(obj.DH_table, 2, 5);
+            ya_solved = double(subs(ya,parameters_old,parameters_new))
+
             
-            x = subs(x, obj.q,q_values');
+            J_fixed = sym(zeros(6,3));
+            
+            J_fixed(1:3,:) = GeoJacob(4:6,:);
+            J_fixed(4:6,:) = GeoJacob(1:3,:);
 
-            rotMatrix = double(subs(x, parameters_old,parameters_new));
-            phi2 = rotm2eul(rotMatrix(1:3,1:3),"ZYZ");
 
-            Y_res = subs(Y,parameters_old,parameters_new);
+            Tau = obj.equationOfMotionLangrangian;
 
-            p = double(subs(Y_res, [obj.phi(1),obj.phi(2),obj.phi(3)], [phi2(1),phi2(2),phi2(3)]));
+            ya_expected = (Ta'*pinv(J_fixed')*Tau);
 
+            ya_ex_solved = double(subs(ya_expected, parameters_old,parameters_new))
 
         end
     end
@@ -439,7 +450,7 @@ classdef Robot
 
             jacobianMatrix = simplify(jacobianMatrix);
         end
-
+      
         function analyticalJacobianMatrix = generateAnalyticalJacobianMatrix(~,pe,q)
             analyticalJacobianMatrix = sym(zeros(3,size(q,1)));
             
@@ -488,6 +499,27 @@ classdef Robot
             partial = sym(zeros(6, size(joints,2)));
             H = obj.getHomogeneousMatrix(dh_table, 2, index+1);
             P_li = H(1:3,1:3)*P_COM(index-1,:)'+H(1:3,4);
+
+            for i=2:index
+                H_pre = obj.getHomogeneousMatrix(dh_table,2, i);
+
+                if(joints(i-1) == "Revolut")
+                    partial(4:6,i-1) = cross(H_pre(1:3,3), P_li - H_pre(1:3,4));
+                    partial(1:3,i-1) = H_pre(1:3,3);
+                else
+                    partial(4:6,i-1) = H_pre(1:3,3);
+                end
+
+            end
+            partial = simplify(partial);
+        end
+
+        %index 1 is base, but in this the base is transfered to link 1 so
+        %it is 2
+        function partial = generateGeometricalJacobianFromFirstJoint(obj, dh_table, joints, index)
+            partial = sym(zeros(6, size(joints,2)));
+            H = obj.getHomogeneousMatrix(dh_table, 2, index+1);
+            P_li = H(1:3,4);
 
             for i=2:index
                 H_pre = obj.getHomogeneousMatrix(dh_table,2, i);
@@ -680,12 +712,12 @@ classdef Robot
             Ta = simplify(Ta);
         end
         
-        function [Ba, Ca, Ga] = operationalSpaceDynamicModel(obj, Ja, B, C, G, h, he, q, q_dot)
+        function [Ba, Ca, Ga] = operationalSpaceDynamicModel(obj, Ja, B, C, G, q, q_dot)
             analyticalJacobian = sym(zeros(6,3));
             analyticalJacobian(1:3,:) = Ja(4:6,:);
             analyticalJacobian(4:6,:) = Ja(1:3,:);
 
-            Ja_inv_T = pinv(analyticalJacobian');
+            Ja_inv = pinv(analyticalJacobian);
 
             time = sym("t");
             q_time = [symfun("q1(t)", time); symfun("q2(t)", time); symfun("q3(t)", time)];
@@ -696,10 +728,9 @@ classdef Robot
 
             J_dot = subs(J_dot, [q_time_dot; q_time], [q_dot; q]);
 
-            B = simplify(B);
-            Ba = Ja_inv_T * B * pinv(analyticalJacobian);
-            Ca = ((Ja_inv_T * C) - Ba *J_dot)*q_dot;
-            Ga = Ja_inv_T * G;
+            Ba = Ja_inv' * B * Ja_inv;
+            Ca = Ja_inv' * C * q_dot - Ba *J_dot*q_dot;
+            Ga = Ja_inv' * G;
         end
     end
 end
