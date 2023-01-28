@@ -1,3 +1,15 @@
-qd = [0.3, -0.1, 0.1];
-Kp = diag([400 380 250]);
-Kd = diag([30 40 15]);
+%sine parameters
+A = 1;
+Fc = 1;
+
+%Joint variables values
+qd = [1.3, -0.5, -1.3];
+
+%PD control values
+Kp = [[100,0,0];
+      [0,100,0];
+      [0,0,100]];
+
+Kd = [[10,0,0];
+      [0,10,0];
+      [0,0,10]];
