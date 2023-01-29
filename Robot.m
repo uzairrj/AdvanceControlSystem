@@ -8,7 +8,7 @@ classdef Robot
         AnalyticalJacobianMatrixComplete;
     end
     properties (Access = private)
-        r1,inertia_vars,q, q_dot, q_dot_dot, masses, lengths, g, f_e, mu_e, P_COM, phi, x_dot_dot;
+        r1,inertia_vars,q, q_dot, q_dot_dot, masses, lengths, g, f_e, mu_e, P_COM, phi, x_dot_dot, Fs, Fv;
     end
     methods
         %%Default constructor
@@ -44,6 +44,9 @@ classdef Robot
 
              obj.f_e = [sym("fex",'real');sym("fey",'real');sym("fez",'real')];
              obj.mu_e = [sym("muex",'real');sym("muey",'real');sym("muez",'real')];
+
+             obj.Fs = [sym("Fs1","real"),sym("Fs2","real"),sym("Fs3","real")];
+             obj.Fv = [sym("Fv1","real"),sym("Fv2","real"),sym("Fv3","real")];
 
              obj.TransoformationMatrix = obj.getTransformationMatrix(obj.DH_table, 4);
 
@@ -96,6 +99,9 @@ classdef Robot
            density = 2700; %Almunium density
            mass_values = [pi * obj.lengths(1,1)^2*obj.lengths(1,3)*density, obj.lengths(2,1)*obj.lengths(2,2)*obj.lengths(3,3)*density, obj.lengths(3,1)^2*obj.lengths(3,3)*density];
            
+           Fs_values = [1.5,1.5,1.5];
+           Fv_values = [0.5,0.5,0.5];
+
            lenghts_values = [
                [0.02, 0.1256, 0.4]; 
                [0.03, 0.03, 0.3]; 
@@ -112,8 +118,8 @@ classdef Robot
            f_e_values = [0;0;0];
            mu_e_values = [0;0;0];
 
-           parameters_old = [obj.masses(1), obj.masses(2), obj.masses(3),obj.g, obj.q(1), obj.q(2), obj.q(3),obj.r1, obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3), obj.q_dot(1),obj.q_dot(2),obj.q_dot(3),obj.q_dot_dot(1),obj.q_dot_dot(2),obj.q_dot_dot(3), obj.f_e(1),obj.f_e(2),obj.f_e(3),obj.mu_e(1),obj.mu_e(2),obj.mu_e(3)];
-           parameters_new  = [mass_values(1), mass_values(2), mass_values(3), g_value, q_values(1),q_values(2),q_values(3),r1_value, lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3),q_dot_values(1),q_dot_values(2),q_dot_values(3),q_dot_dot_values(1),q_dot_dot_values(2),q_dot_dot_values(3), f_e_values(1),f_e_values(2),f_e_values(3), mu_e_values(1),mu_e_values(2), mu_e_values(3)];
+           parameters_old = [obj.masses(1), obj.masses(2), obj.masses(3),obj.g, obj.q(1), obj.q(2), obj.q(3),obj.r1, obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3), obj.q_dot(1),obj.q_dot(2),obj.q_dot(3),obj.q_dot_dot(1),obj.q_dot_dot(2),obj.q_dot_dot(3), obj.f_e(1),obj.f_e(2),obj.f_e(3),obj.mu_e(1),obj.mu_e(2),obj.mu_e(3), obj.Fs, obj.Fv];
+           parameters_new  = [mass_values(1), mass_values(2), mass_values(3), g_value, q_values(1),q_values(2),q_values(3),r1_value, lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3),q_dot_values(1),q_dot_values(2),q_dot_values(3),q_dot_dot_values(1),q_dot_dot_values(2),q_dot_dot_values(3), f_e_values(1),f_e_values(2),f_e_values(3), mu_e_values(1),mu_e_values(2), mu_e_values(3), Fs_values, Fv_values];
 
            disp("q vector: ");
            disp(q_values);
@@ -313,12 +319,12 @@ classdef Robot
             C = obj.coriolisMatrix(Bq, obj.q, obj.q_dot);
             G = obj.gravityMatrix(obj.DH_table, obj.P_COM, obj.Joints, obj.masses, obj.g);
 
-            EoM = Bq*obj.q_dot_dot + C*obj.q_dot + G;
+            EoM = Bq*obj.q_dot_dot + C*obj.q_dot + diag(obj.Fv)*obj.q_dot + diag(obj.Fs)*sign(obj.q_dot) + G;
         end
 
         function EoM = equationOfMotionNewtonEuler(obj)
             [w,w_dot, p_dot_dot_c] = obj.forwardEquation(obj.g, obj.DH_table, obj.q_dot, obj.q_dot_dot, obj.P_COM, obj.Joints);
-            EoM = obj.backwordEquation(w,w_dot,p_dot_dot_c, obj.f_e, obj.mu_e, obj.DH_table, obj.P_COM, obj.masses,obj.Joints, obj.lengths)';
+            EoM = obj.backwordEquation(w,w_dot,p_dot_dot_c, obj.f_e, obj.mu_e, obj.DH_table, obj.P_COM, obj.masses,obj.Joints, obj.lengths, obj.Fv, obj.Fs, obj.q_dot)';
         end
 
         function res = solveAnalyticalJacobianComplete(obj, t_1, d_1, t_2)
@@ -655,8 +661,8 @@ classdef Robot
             end
         end
         
-        function tourqe = backwordEquation(obj, w,w_dot,p_dot_dot_c, f_e, mu_e, dh_table, P_COM, masses, joints, lengths)
-            f_next =f_e;
+        function tourqe = backwordEquation(obj, w,w_dot,p_dot_dot_c, f_e, mu_e, dh_table, P_COM, masses, joints, lengths, Fv, Fs, q_dot)
+            f_next = f_e;
             mu_next = mu_e;
             Z0 = [0;0;1];
 
@@ -684,6 +690,8 @@ classdef Robot
                 else
                     tourqe(i-2) = mu' * R_m_1'*Z0;
                 end
+
+                tourqe(i-2) = tourqe(i-2) + Fv(i-2)*q_dot(i-2) + Fs(i-2)*sign(q_dot(i-2));
 
                 f_next = f;
                 mu_next = mu;
