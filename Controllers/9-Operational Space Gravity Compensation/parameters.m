@@ -16,9 +16,9 @@ params.m = mass_values;
 %gravity
 params.g = 9.806;
 
-q1 = 3.3;
+q1 = -3.3;
 q2 = -0.2;
-q3 = 2.3;
+q3 = -2.3;
 
 H = [[       0,         -cos(q3),        -sin(q3),                                                     -(4*sin(q3))/25]
      [ sin(q1), -cos(q1)*sin(q3), cos(q1)*cos(q3),        (2*cos(q1))/5 + (4*cos(q1)*cos(q3))/25 - sin(q1)*(q2 + 3/10)]
@@ -31,6 +31,6 @@ eulers = rotm2eul(H(1:3,1:3),"ZYZ");
 xd = [H(1:3,4); eulers'];
 
 %PD control values
-Kp = diag([500,500,500,1,1,1]);
+Kp = diag([50,50,50,50,50,50]);
 
-Kd = diag([100,100,100,1,1,1]);
+Kd = diag([10,10,10,10,10,10]);
