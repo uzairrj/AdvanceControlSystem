@@ -16,14 +16,16 @@ params.m = mass_values;
 %gravity
 params.g = 9.806;
 
-q1 = 2;
-q2 = -0.2;
+q1 = 1;
+q2 = 0.2;
 q3 = 0;
 
-H = [[       0,         -cos(q3),        -sin(q3),                                                     -(4*sin(q3))/25]
-     [ sin(q1), -cos(q1)*sin(q3), cos(q1)*cos(q3),        (2*cos(q1))/5 + (4*cos(q1)*cos(q3))/25 - sin(q1)*(q2 + 3/10)]
-     [-cos(q1), -sin(q1)*sin(q3), cos(q3)*sin(q1), (2*sin(q1))/5 + cos(q1)*(q2 + 3/10) + (4*cos(q3)*sin(q1))/25 + 3/20]
-     [       0,                0,               0,                                                                   1]];
+    
+    H = [[       0,         -cos(q3),        -sin(q3),                                                     -(4*sin(q3))/25]
+[ sin(q1), -cos(q1)*sin(q3), cos(q1)*cos(q3),        (2*cos(q1))/5 + (4*cos(q1)*cos(q3))/25 - sin(q1)*(q2 + 3/10)]
+[-cos(q1), -sin(q1)*sin(q3), cos(q3)*sin(q1), (2*sin(q1))/5 + cos(q1)*(q2 + 3/10) + (4*cos(q3)*sin(q1))/25 + 3/20]
+[       0,                0,               0,                                                                   1]];
+
 
 eulers = rotm2eul(H(1:3,1:3),"ZYZ");
 
@@ -35,13 +37,13 @@ xd = [H(1:3,4); eulers'];
 %PD control values
 Kp = diag([150,150,150,150,150,150]);
 
-Kd = diag([30,30,30,30,30,30]);
+Kd = diag([70,70,70,70,70,70]);
 
 %enviroment stiffness
-parms.Ke = diag([50,50,50,50,50,50]);
+parms.Ke = diag([90,90,90,90,90,90]);
 
 %plane position
-parms.plane_pos = [0,0,0.45,0,0,0]';
+parms.plane_pos = [0,0,0.5,0,0,0]';
 %parms.plane_pos = [0,0,9.0,0,0,0]';
 
 %plane axis
