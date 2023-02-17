@@ -23,7 +23,7 @@ function [sys, x, str, ts] = Manipulator(t,x,u,flag, parameters)
         C = double(corolisMatrix(parameters));
         G = double(gravityMatrix(parameters));
         
-        q_dot_dot = inv(B)*(tau - C*q_dot - G);
+        q_dot_dot = pinv(B)*(tau - C*q_dot - G);
 
         sys = [q_dot_dot; q_dot];
 
