@@ -34,11 +34,9 @@ Kd = diag([10,10,10,1,1,1]);
 Md = diag([0.12,0.12,0.12,0,0,0]);
 
 
-
-%Compliant Frame variables
-Mt = diag([0.3,0.3,0.3,0.3,0.3,0.3]);
-Kdt = diag([10,10,10,1,1,1]);
-Kpt = diag([190,190,190,1,1,1]);
+Kpt = diag([50,50,50,1,1,1]);
+Kdt = diag([5,5,5,1,1,1]);
+Mt = diag([1,1,1,1,1,1]);
 
 
 %enviroment stiffness
