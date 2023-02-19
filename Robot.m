@@ -93,7 +93,7 @@ classdef Robot
         end
 
         function test(obj, robot)
-           q_values = [1.34, 2.34, 0.66];
+           q_values = [1.34, -0.2, -0.66];
            %q_values = [0, 0, 0];
            r1_value = 0.15;
            density = 2700; %Almunium density
@@ -141,7 +141,7 @@ classdef Robot
            disp("Inverse Kinematics q's: ");
            transformationRes = obj.directKinematics(q_values(1)*(pi/180),q_values(2),q_values(3)*(pi/180));
            disp(obj.inverseKinematics(transformationRes(1,4),transformationRes(2,4),transformationRes(3,4)));
-
+           
            disp("Geometrical Jacobian Toolkit: ");
            disp(geometricJacobian(robot, config,"ee"));
 
