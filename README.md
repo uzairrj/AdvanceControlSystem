@@ -1,2 +1,5 @@
-# AdvanceControlSystem
-Advance Control System
+# Advance Control System
+This github repository presents the modeling and control of a 3 degree of freedom (DoF) robot with a fixed base and two revolute joints and one prismatic joint. The robot is modeled using the Denavit-Hartenberg convention and its forward and inverse kinematics are derived using transformation matrices and symbolic equations. The differential kinematics of the robot are obtained using geometrical and analytical Jacobians and used to study the velocities of the end-effector. The dynamics of the robot are derived using both Lagrange and Newton-Euler formulations and compared for accuracy and efficiency. Different controllers for the robot are designed and tested in both joint space and operational space using MATLAB Simulink. The controllers include proportional-derivative (PD) control, inverse dynamics control, adaptive control, direct force control, and indirect force control. The performance of each controller is evaluated for various tasks such as tracking a desired trajectory or applying a desired force.
+
+# Revolute Prismatic Revolute (RPR) Robot
+![alt text](https://images2.imgbox.com/72/1a/YRJ4OoM5_o.png)
