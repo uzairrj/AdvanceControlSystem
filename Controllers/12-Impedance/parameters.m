@@ -27,18 +27,18 @@ params.Fv = [0,0,0];
 %Md = diag([0.2,0.2,0.2,0,0,0]);
 
 
-Kp = diag([190,190,190,1,1,1]);
+Kp = diag([250,250,250,250,250,250]);
 
-Kd = diag([10,10,10,1,1,1]);
+Kd = diag([50,50,50,50,50,50]);
 
-Md = diag([0.12,0.12,0.12,0,0,0]);
+Md = diag([3,3,3,3,3,3]);
 
 
 %enviroment stiffness
-parms.Ke = diag([1,1,5,1,1,1]);
+parms.Ke = diag([0,0,10,0,0,0]);
 
 %plane position
-parms.plane_pos = [0,0,99.55,0,0,0]';
+parms.plane_pos = [0,0,0.55,0,0,0]';
 %parms.plane_pos = [0,0,9.0,0,0,0]';
 
 %plane axis

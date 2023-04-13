@@ -19,7 +19,7 @@ params.g = 9.806;
 %Friction
 params.Fv = [0,0,0];
 
-q1 = 3;
+q1 = -2;
 q2 = -0.2;
 q3 = -3;
 
@@ -29,28 +29,25 @@ q3 = -3;
 [       0,                0,               0,                                                            1]];
 
 
-eulers = rotm2eul(H(1:3,1:3),"ZYZ");
-
-
 %operational space desired values
-xd = [H(1:3,4); eulers'];
+xd = [H(1:3,4)'];
 
 %PD control values
-Kp = diag([40,40,40,1,1,1]);
-Kd = diag([25,25,25,1,1,1]);
-Md = diag([0.12,0.12,0.12,0,0,0]);
+Kp = diag([200,200,200]);
+Kd = diag([50,50,50]);
+Md = diag([0.12,0.12,0.12]);
 
 %force control parameters
-fd = [0,0,3,0,0,0];
+fd = [0,0,3];
 
-Kf = diag([55,55,55,1,1,1]);
-Ki = diag([50,50,50,1,1,1]);
+Kf = diag([50,50,50]);
+Ki = diag([50,50,50]);
 
 %enviroment stiffness
-parms.Ke = diag([1,1,1,1,1,1]);
+parms.Ke = diag([0,0,5]);
 
 %plane position
-parms.plane_pos = [0,0,0.3,0,0,0]';
+parms.plane_pos = [0,0,0.3]';
 %parms.plane_pos = [0,0,9.0,0,0,0]';
 
 %plane axis

@@ -35,16 +35,16 @@ xd = [H(1:3,4); eulers'];
 %xd = [0;0;9.00;0;0;0];
 
 %PD control values
-Kp = diag([150,150,150,150,150,150]);
+Kp = diag([550,550,550,30,30,30]);
 
-Kd = diag([70,70,70,70,70,70]);
+Kd = diag([70,70,70,10,10,10]);
 
 %enviroment stiffness
-parms.Ke = diag([90,90,90,90,90,90]);
+parms.Ke = diag([0,0,850,0,0,0]);
 
 %plane position
 parms.plane_pos = [0,0,0.5,0,0,0]';
-%parms.plane_pos = [0,0,9.0,0,0,0]';
+%parms.plane_pos = [0,0,7.0,0,0,0]';
 
 %plane axis
 parms.plane_axis = 3; %z-axis

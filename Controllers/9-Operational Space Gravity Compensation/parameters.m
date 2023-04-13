@@ -20,9 +20,14 @@ params.m = mass_values;
 params.g = 9.806;
 
 
-q1 = 3;
-q2 = -0.2;
-q3 = -3;
+%q1 = 2;
+%q2 = -0.1;
+%q3 = -3;
+
+%singularity
+q1 = -2;
+q2 = 0.12;
+q3 = 3;
 
     H = [[ sin(q1), -cos(q1)*sin(q3), cos(q1)*cos(q3), (2*cos(q1))/5 + (4*cos(q1)*cos(q3))/25 - sin(q1)*(q2 + 3/10)]
 [-cos(q1), -sin(q1)*sin(q3), cos(q3)*sin(q1), (2*sin(q1))/5 + cos(q1)*(q2 + 3/10) + (4*cos(q3)*sin(q1))/25]
@@ -37,7 +42,7 @@ eulers = rotm2eul(H(1:3,1:3),"ZYZ");
 xd = [H(1:3,4); eulers'];
 
 %PD control values
-Kp = diag([500,500,500,3,3,3]);
+Kp = diag([1000,1000,1000,5,5,5]);
 
-Kd = diag([230,230,230,1,1,1]);
+Kd = diag([250,250,250,2,2,2]);
 

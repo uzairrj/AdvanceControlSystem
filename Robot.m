@@ -93,7 +93,7 @@ classdef Robot
         end
 
         function test(obj, robot)
-           q_values = [1.34, -0.2, -0.66];
+           q_values = [0.1, 1.2, 1.66];
            %q_values = [0, 0, 0];
            r1_value = 0.15;
            density = 2700; %Almunium density
@@ -110,8 +110,8 @@ classdef Robot
 
            mass_values = subs(mass_values, [obj.lengths(1,1),obj.lengths(1,2), obj.lengths(1,3), obj.lengths(2,1),obj.lengths(2,2), obj.lengths(2,3),obj.lengths(3,1),obj.lengths(3,2), obj.lengths(3,3)], [lenghts_values(1,1), lenghts_values(1,2), lenghts_values(1,3),lenghts_values(2,1), lenghts_values(2,2), lenghts_values(2,3),lenghts_values(3,1), lenghts_values(3,2), lenghts_values(3,3)]);
 
-           q_dot_values = [1.23,2.22,1.23];
-           q_dot_dot_values = [3.3,3.0,3.3];
+           q_dot_values = [0,0,0];
+           q_dot_dot_values = [0,0,0];
            
            g_value = 9.806;
 
@@ -314,6 +314,12 @@ classdef Robot
             disp(double(subs(t_NE,parameters_old, parameters_new)));
         end
 
+
+        function toBeDeleted(obj)
+            s = simplify(obj.getHomogeneousMatrix(obj.DH_table,1,5))
+            disp("Latex");
+            latex(s)
+        end
         function EoM = equationOfMotionLangrangian(obj)
             Bq = obj.inertiaMatrix(obj.DH_table, obj.masses, obj.P_COM, obj.Joints, obj.lengths);
             C = obj.coriolisMatrix(Bq, obj.q, obj.q_dot);
